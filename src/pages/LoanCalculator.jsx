@@ -11,6 +11,7 @@ import NIMCard from "../components/loan/NIMCard";
 import RiskPanel from "../components/loan/RiskPanel";
 import AmortizationTable from "../components/loan/AmortizationTable";
 import MetricsTable from "../components/loan/MetricsTable";
+import PreviousLoanCheck from "../components/loan/previousloancheck";
 
 const DEFAULT_FORM = {
   product: "Housing Loan",
@@ -67,6 +68,9 @@ export default function LoanCalculator() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+        {/* Previous Loan Check */}
+        <PreviousLoanCheck />
+
         {/* Input Form */}
         <LoanInputForm form={form} setForm={setForm} onCalculate={handleCalculate} />
 
