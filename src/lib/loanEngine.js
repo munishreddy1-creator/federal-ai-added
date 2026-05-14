@@ -1,46 +1,26 @@
 /**
  * FederalCreditPro — Loan Underwriting & Pricing Engine
- * All business logic extracted from Base44 component field names & gate checks
+ * Pure function architecture for reusable, deterministic calculations
+ * All business rules sourced from underwritingConfig.js
  */
 
-// ─── Rate Bands ────────────────────────────────────────────────────────────────
-const RATE_BANDS = {
-  "Housing Loan": [
-    { min: 750, max: 900, rate: { min: 8.0, max: 9.5 } },
-    { min: 700, max: 749, rate: { min: 8.5, max: 11.5 } },
-    { min: 650, max: 699, rate: { min: 10.5, max: 12.0 } },
-    { min: 300, max: 649, rate: { min: 12.0, max: 14.0 } },
-  ],
-  "Auto Loan": [
-    { min: 750, max: 900, rate: { min: 9.0, max: 10.0 } },
-    { min: 700, max: 749, rate: { min: 10.0, max: 11.5 } },
-    { min: 650, max: 699, rate: { min: 11.5, max: 13.5 } },
-    { min: 300, max: 649, rate: { min: 13.5, max: 16.0 } },
-  ],
-  "Gold Loan": [
-    { min: 750, max: 900, rate: { min: 7.5, max: 8.5 } },
-    { min: 700, max: 749, rate: { min: 8.5, max: 9.5 } },
-    { min: 650, max: 699, rate: { min: 9.5, max: 11.0 } },
-    { min: 300, max: 649, rate: { min: 11.0, max: 13.0 } },
-  ],
-};
-
-// ─── LTV Caps ─────────────────────────────────────────────────────────────────
-const LTV_CAPS = {
-  "Housing Loan": 80,
-  "Auto Loan": 85,
-  "Gold Loan": 75,
-};
-
-// ─── Cost of Funds (benchmark) ────────────────────────────────────────────────
-const COST_OF_FUNDS = {
-  "Housing Loan": 5.5,
-  "Auto Loan": 7.0,
-  "Gold Loan": 6.0,
-};
-
-// ─── Festival season discount ─────────────────────────────────────────────────
-const FESTIVAL_DISCOUNT = 0.25; // 0.25% rate reduction
+import {
+  RATE_BANDS,
+  SCORE_WEIGHTS,
+  GATE_THRESHOLDS,
+  FESTIVAL_DISCOUNT,
+  STRESS_CONFIG,
+  DEFAULT_COST_OF_FUNDS,
+  OCCUPATION_TYPES,
+  DECISION_REASON_CODE_TEMPLATES,
+  getLTVCap,
+  getCostOfFunds,
+  applyAgeBasedReduction,
+  validateLTVRange,
+  hasCreditRisk,
+  getReasonCodeTemplate,
+  AGE_ADJUSTMENT_RULES,
+} from "./underwritingConfig.js";
 
 // ─── EMI Calculation ──────────────────────────────────────────────────────────
 export function calcEMI(principal, annualRate, months) {
@@ -130,15 +110,15 @@ function scoreLiquidity(savings, monthlyObligations, monthlySpends) {
 }
 
 // ─── Weighted Score ───────────────────────────────────────────────────────────
-function calcWeightedScore(scores) {
+export function calcWeightedScore(scores) {
   return (
-    scores.cibil * 0.25 +
-    scores.dti * 0.20 +
-    scores.ltv * 0.20 +
-    scores.income * 0.10 +
-    scores.defaults * 0.10 +
-    scores.spend * 0.10 +
-    scores.liquidity * 0.05
+    scores.cibil * SCORE_WEIGHTS.cibil +
+    scores.dti * SCORE_WEIGHTS.dti +
+    scores.ltv * SCORE_WEIGHTS.ltv +
+    scores.income * SCORE_WEIGHTS.income +
+    scores.defaults * SCORE_WEIGHTS.defaults +
+    scores.spend * SCORE_WEIGHTS.spend +
+    scores.liquidity * SCORE_WEIGHTS.liquidity
   );
 }
 
@@ -164,50 +144,101 @@ function finalRateFromScore(band, weightedScore, season) {
 // ─── Gate Checks ──────────────────────────────────────────────────────────────
 function runGates(form, derived) {
   const { cibil_score, past_defaults } = form;
-  const { dti, ltv, ltvCap, spendToIncome, surplus, emi, stressEMI } = derived;
+  const { dti, ltv, ltvCap, spendToIncome, surplus, emi, stressEMI, projectedResidualIncome } = derived;
 
   const gates = {};
 
   // CIBIL gate
-  if (cibil_score >= 700) gates.cibil = "PASS";
-  else if (cibil_score >= 650) gates.cibil = "MANUAL";
+  if (cibil_score >= GATE_THRESHOLDS.cibil.pass) gates.cibil = "PASS";
+  else if (cibil_score >= GATE_THRESHOLDS.cibil.manual) gates.cibil = "MANUAL";
   else gates.cibil = "REJECT";
 
   // Spend-to-income gate
-  if (spendToIncome <= 0.5) gates.spend = "PASS";
-  else if (spendToIncome <= 0.7) gates.spend = "MANUAL";
+  if (spendToIncome <= GATE_THRESHOLDS.spend.pass) gates.spend = "PASS";
+  else if (spendToIncome <= GATE_THRESHOLDS.spend.manual) gates.spend = "MANUAL";
   else gates.spend = "REJECT";
 
   // DTI gate
-  if (dti <= 0.4) gates.dti = "PASS";
-  else if (dti <= 0.55) gates.dti = "MANUAL";
+  if (dti <= GATE_THRESHOLDS.dti.pass) gates.dti = "PASS";
+  else if (dti <= GATE_THRESHOLDS.dti.manual) gates.dti = "MANUAL";
   else gates.dti = "REJECT";
 
   // LTV gate
-  if (ltv <= ltvCap) gates.ltv = "PASS";
-  else if (ltv <= ltvCap * 1.05) gates.ltv = "MANUAL";
+  if (ltv <= ltvCap * GATE_THRESHOLDS.ltv.capMultiplier.pass) gates.ltv = "PASS";
+  else if (ltv <= ltvCap * GATE_THRESHOLDS.ltv.capMultiplier.manual) gates.ltv = "MANUAL";
   else gates.ltv = "REJECT";
 
-  // EMI affordability gate (EMI ≤ 50% of surplus, or PASS if surplus = 0)
-  if (surplus <= 0 || emi <= surplus * 0.5) gates.emi = "PASS";
-  else if (emi <= surplus * 0.65) gates.emi = "MANUAL";
+  // EMI affordability gate (based on projected residual income after EMI)
+  if (projectedResidualIncome > 0 && emi <= surplus * GATE_THRESHOLDS.emi.passRatio) gates.emi = "PASS";
+  else if (projectedResidualIncome > 0 && emi <= surplus * GATE_THRESHOLDS.emi.manualRatio) gates.emi = "MANUAL";
   else gates.emi = "REJECT";
 
-  // Stress test gate (stress EMI ≤ 85% of surplus, or PASS if surplus = 0)
-  if (surplus <= 0 || stressEMI <= surplus * 0.85) gates.stress = "PASS";
-  else if (stressEMI <= surplus) gates.stress = "MANUAL";
+  // Stress test gate (stress EMI ≤ 85% of surplus)
+  if (surplus <= 0 || stressEMI <= surplus * GATE_THRESHOLDS.stress.passRatio) gates.stress = "PASS";
+  else if (stressEMI <= surplus * GATE_THRESHOLDS.stress.manualRatio) gates.stress = "MANUAL";
   else gates.stress = "REJECT";
 
   // Residual income gate
   const residualIncome = surplus - emi;
-  if (surplus <= 0 || residualIncome >= surplus * 0.15) gates.residual = "PASS";
-  else if (residualIncome >= 0) gates.residual = "MANUAL";
+  if (surplus <= 0 || residualIncome >= surplus * GATE_THRESHOLDS.residual.passRatio) gates.residual = "PASS";
+  else if (residualIncome >= GATE_THRESHOLDS.residual.manualRatio) gates.residual = "MANUAL";
   else gates.residual = "REJECT";
 
   return gates;
 }
 
-// ─── Decision ─────────────────────────────────────────────────────────────────
+// ─── Decision Engine (NEW: Priority-Based) ────────────────────────────────────
+/**
+ * Evaluate final underwriting decision
+ * Priority: Hard Rejects -> Manual Reviews -> Approval
+ */
+export function evaluateFinalDecision(form, derived, gates) {
+  const { past_defaults } = form;
+  const { projectedResidualIncome, creditRisk, ltvOutOfRange } = derived;
+
+  // HARD REJECT CONDITIONS
+  // 1. Affordability failure: projected residual income <= 0
+  if (projectedResidualIncome <= 0) {
+    return { decision: "REJECT", reason: "AFFORDABILITY_FAILURE" };
+  }
+
+  // 2. Hard reject for past defaults (2 or more)
+  if (past_defaults >= 2) {
+    return { decision: "REJECT", reason: "EXCESSIVE_PAST_DEFAULTS" };
+  }
+
+  // 3. Hard reject for active overdue (active default payment)
+  if (creditRisk.hasCreditRisk && creditRisk.activeOverdueAmount > 0) {
+    return {
+      decision: "REJECT",
+      reason: "ACTIVE_OVERDUE_PAYMENT",
+    };
+  }
+
+  // MANUAL REVIEW CONDITIONS
+  // 4. Credit risk (non-active): escalate to manual review
+  if (creditRisk.hasCreditRisk) {
+    return {
+      decision: "MANUAL_REVIEW",
+      reason: creditRisk.primaryReason || "CREDIT_RISK_DETECTED",
+    };
+  }
+
+  // 4. Any gate rejection (except affordability which is hard reject above)
+  if (Object.values(gates).includes("REJECT")) {
+    return { decision: "REJECT", reason: "GATE_REJECTION" };
+  }
+
+  // 5. Any gate manual review
+  if (Object.values(gates).includes("MANUAL")) {
+    return { decision: "MANUAL_REVIEW", reason: "GATE_MANUAL_REVIEW" };
+  }
+
+  // DEFAULT: APPROVAL
+  return { decision: "APPROVE", reason: "ALL_GATES_PASSED" };
+}
+
+// Legacy function for backward compatibility
 function calcDecision(gates, past_defaults) {
   const values = Object.values(gates);
   if (past_defaults >= 2) return "REJECT";
@@ -217,6 +248,151 @@ function calcDecision(gates, past_defaults) {
 }
 
 // ─── Risk Reason Codes ────────────────────────────────────────────────────────
+/**
+ * Generate explainable reason codes for decision
+ */
+export function generateReasonCodes(form, derived, gates, decision) {
+  const reasons = [];
+  const { cibil_score, past_defaults } = form;
+  const { dti, ltv, ltvCap, spendToIncome, surplus, emi, stressEMI, residualIncome, creditRisk, isFestiveSeason, isAgeAdjusted } = derived;
+
+  // Credit Risk Reasons (HIGHEST PRIORITY)
+  if (creditRisk?.hasCreditRisk) {
+    if (creditRisk.activeOverdueAmount > 0) {
+      reasons.push({
+        code: "RC_ACTIVE_OVERDUE",
+        label: "Active Overdue Amount Detected",
+        detail: `Active overdue: ₹${Math.round(creditRisk.activeOverdueAmount).toLocaleString("en-IN")}. Application escalated to manual review.`,
+        severity: "CRITICAL",
+        impact: "MANUAL_REVIEW",
+      });
+    }
+    if (creditRisk.emiDefaultCount > 0) {
+      reasons.push({
+        code: "RC_EMI_DEFAULT",
+        label: "EMI Default History",
+        detail: `${creditRisk.emiDefaultCount} EMI default(s) detected. Requires manual review.`,
+        severity: "HIGH",
+        impact: "MANUAL_REVIEW",
+      });
+    }
+    if (creditRisk.overdueEMICount > 0) {
+      reasons.push({
+        code: "RC_OVERDUE_EMI",
+        label: "Multiple Overdue EMIs",
+        detail: `${creditRisk.overdueEMICount} overdue EMI(s) on record. Manual review recommended.`,
+        severity: "HIGH",
+        impact: "MANUAL_REVIEW",
+      });
+    }
+  }
+
+  // Gate-based Reasons
+  if (gates.cibil !== "PASS") {
+    reasons.push({
+      code: "RC_LOW_CIBIL",
+      label: "Low CIBIL Score",
+      detail: `Score ${cibil_score} is below the preferred threshold of ${GATE_THRESHOLDS.cibil.pass}.`,
+      severity: "MEDIUM",
+      impact: gates.cibil === "REJECT" ? "REJECT" : "MANUAL_REVIEW",
+    });
+  }
+
+  if (gates.dti !== "PASS") {
+    reasons.push({
+      code: "RC_HIGH_DTI",
+      label: "High Debt-to-Income Ratio",
+      detail: `DTI of ${(dti * 100).toFixed(1)}% exceeds the ${GATE_THRESHOLDS.dti.pass * 100}% guideline.`,
+      severity: "MEDIUM",
+      impact: gates.dti === "REJECT" ? "REJECT" : "MANUAL_REVIEW",
+    });
+  }
+
+  if (gates.ltv !== "PASS") {
+    reasons.push({
+      code: "RC_LTV_BREACH",
+      label: "LTV Cap Breached",
+      detail: `LTV of ${ltv.toFixed(1)}% exceeds the ${ltvCap}% cap${isFestiveSeason ? " (festive season)" : ""} for ${form.product}.`,
+      severity: "MEDIUM",
+      impact: gates.ltv === "REJECT" ? "REJECT" : "MANUAL_REVIEW",
+    });
+  }
+
+  if (gates.spend !== "PASS") {
+    reasons.push({
+      code: "RC_HIGH_SPEND",
+      label: "High Spend-to-Income Ratio",
+      detail: `Spends are ${(spendToIncome * 100).toFixed(1)}% of income, indicating low savings discipline.`,
+      severity: "MEDIUM",
+      impact: gates.spend === "REJECT" ? "REJECT" : "MANUAL_REVIEW",
+    });
+  }
+
+  if (gates.emi !== "PASS") {
+    reasons.push({
+      code: "RC_EMI_AFFORD",
+      label: "EMI Affordability Concern",
+      detail: `EMI of ₹${Math.round(emi).toLocaleString("en-IN")} is high relative to monthly surplus of ₹${Math.round(surplus).toLocaleString("en-IN")}.`,
+      severity: "MEDIUM",
+      impact: gates.emi === "REJECT" ? "REJECT" : "MANUAL_REVIEW",
+    });
+  }
+
+  if (gates.stress !== "PASS") {
+    reasons.push({
+      code: "RC_STRESS_FAIL",
+      label: "Fails Stress Test",
+      detail: `At +2% rate shock, EMI would be ₹${Math.round(stressEMI).toLocaleString("en-IN")}, exceeding 85% of surplus.`,
+      severity: "MEDIUM",
+      impact: gates.stress === "REJECT" ? "REJECT" : "MANUAL_REVIEW",
+    });
+  }
+
+  if (gates.residual !== "PASS") {
+    reasons.push({
+      code: "RC_RESIDUAL_LOW",
+      label: "Low Residual Income",
+      detail: "After EMI deduction, remaining income is below minimum comfort threshold.",
+      severity: "MEDIUM",
+      impact: gates.residual === "REJECT" ? "REJECT" : "MANUAL_REVIEW",
+    });
+  }
+
+  if (past_defaults >= 1) {
+    reasons.push({
+      code: "RC_PAST_DEFAULTS",
+      label: "Past Default History",
+      detail: `${past_defaults} past default(s) recorded on credit file.`,
+      severity: "HIGH",
+      impact: past_defaults >= 2 ? "REJECT" : "MANUAL_REVIEW",
+    });
+  }
+
+  // Policy-based Reasons (INFO level)
+  if (isAgeAdjusted) {
+    reasons.push({
+      code: "RC_AGE_REDUCTION",
+      label: "Age-Based Loan Reduction Applied",
+      detail: `Loan eligibility adjusted based on applicant age (${AGE_ADJUSTMENT_RULES.minAgeForReduction}-${AGE_ADJUSTMENT_RULES.maxAgeForReduction} years).`,
+      severity: "LOW",
+      impact: "INFO",
+    });
+  }
+
+  if (isFestiveSeason && form.product === "Auto Loan") {
+    reasons.push({
+      code: "RC_FESTIVE_LTV",
+      label: "Festive Season LTV Applied",
+      detail: `Auto Loan LTV cap increased to 95% for festive season.`,
+      severity: "LOW",
+      impact: "INFO",
+    });
+  }
+
+  return reasons;
+}
+
+// Legacy function for backward compatibility
 function buildRiskReasons(form, derived, gates) {
   const reasons = [];
 
@@ -291,8 +467,11 @@ function calcMaxSafeLoan(surplus, annualRate, months) {
 }
 
 // ─── Main Evaluate Function ───────────────────────────────────────────────────
+/**
+ * Comprehensive loan evaluation with all new features
+ */
 export function evaluate(form) {
-  const {
+  let {
     product,
     season,
     tenure_months,
@@ -304,11 +483,33 @@ export function evaluate(form) {
     savings_balance,
     loan_amount,
     collateral_value,
+    // NEW FIELDS
+    isFestiveSeason = false,
+    existingEMI = 0,
+    emiDefaultCount = 0,
+    overdueEMICount = 0,
+    activeOverdueAmount = 0,
+    applicantAge = null,
+    occupationType = "SALARIED",
+    customCostOfFunds = null,
+    stressMultiplier = null,
+    applicant_name = "",
   } = form;
 
+  // Backward compatibility: convert old "season" field to "isFestiveSeason"
+  const isFestiveSeasonActual = isFestiveSeason || (season === "Festival");
+
+  // Validate inputs
+  monthly_income = Math.max(0, monthly_income || 0);
+  monthly_obligations = Math.max(0, monthly_obligations || 0);
+  monthly_spends = Math.max(0, monthly_spends || 0);
+  loan_amount = Math.max(0, loan_amount || 0);
+  collateral_value = Math.max(0, collateral_value || 0);
+
   const months = tenure_months || 60;
-  const ltvCap = LTV_CAPS[product] || 80;
-  const costOfFunds = COST_OF_FUNDS[product] || 6.5;
+  const isFestive = isFestiveSeasonActual && product === "Auto Loan";
+  const ltvCap = getLTVCap(product, isFestive);
+  const costOfFunds = getCostOfFunds(product, customCostOfFunds);
 
   // ── Derived ratios ──
   const dti = monthly_income > 0 ? monthly_obligations / monthly_income : 0;
@@ -316,10 +517,39 @@ export function evaluate(form) {
   const ltv = collateral_value > 0 ? (loan_amount / collateral_value) * 100 : 100;
   const surplus = monthly_income - monthly_obligations - monthly_spends;
 
+  // ── EMI Calculations (NEW) ──
+  const newEMI = calcEMI(loan_amount, 0, months); // Start with 0% to get base EMI before rate applied
+  const totalEMI = existingEMI + newEMI;
+  const totalObligations = monthly_obligations + newEMI;
+  const totalDTI = monthly_income > 0 ? totalObligations / monthly_income : 0;
+
+  // ── Residual Income (CURRENT) ──
+  const currentSurplus = monthly_income - monthly_obligations - monthly_spends;
+
+  // ── Residual Income (PROJECTED - after new EMI) ──
+  const projectedResidualIncome = monthly_income - monthly_obligations - monthly_spends - newEMI;
+
+  // ── Credit Risk Assessment (NEW) ──
+  const creditRisk = {
+    activeOverdueAmount: activeOverdueAmount || 0,
+    emiDefaultCount: emiDefaultCount || 0,
+    overdueEMICount: overdueEMICount || 0,
+    hasCreditRisk: hasCreditRisk({ activeOverdueAmount, emiDefaultCount, overdueEMICount }),
+    primaryReason: activeOverdueAmount > 0 ? "ACTIVE_OVERDUE_PRESENT" : emiDefaultCount > 0 ? "EMI_DEFAULT_PRESENT" : overdueEMICount > 0 ? "OVERDUE_EMI_COUNT" : null,
+  };
+
+  // ── Age-Based Adjustment (NEW) ──
+  const ageAdjustment = applicantAge ? applyAgeBasedReduction(applicantAge, loan_amount) : { adjustedLoan: loan_amount, isAdjusted: false, reason: null };
+  const isAgeAdjusted = ageAdjustment.isAdjusted;
+  const adjustedLoanAmount = ageAdjustment.adjustedLoan;
+
+  // ── LTV Range Validation (NEW) ──
+  const ltvRangeValidation = validateLTVRange(ltv);
+
   // ── Scores ──
   const scores = {
     cibil: scoreCIBIL(cibil_score),
-    dti: scoreDTI(dti),
+    dti: scoreDTI(totalDTI),
     ltv: scoreLTV(ltv, ltvCap),
     income: scoreIncome(monthly_income),
     defaults: scoreDefaults(past_defaults),
@@ -330,63 +560,136 @@ export function evaluate(form) {
 
   // ── Rate ──
   const rateBand = getRateBand(product, cibil_score);
-  const finalRate = finalRateFromScore(rateBand, weightedScore, season);
-  const stressRate = finalRate + 2;
+  const finalRate = finalRateFromScore(rateBand, weightedScore, isFestive ? "Festival" : "Normal");
+  const stressRate = finalRate + STRESS_CONFIG.rateShock;
 
-  // ── EMI ──
-  const emi = calcEMI(loan_amount, finalRate, months);
-  const stressEMI = calcEMI(loan_amount, stressRate, months);
+  // ── EMI with rate applied ──
+  const emi = calcEMI(adjustedLoanAmount, finalRate, months);
+  const stressEMI = calcEMI(adjustedLoanAmount, stressRate, months);
   const residualIncome = surplus - emi;
 
+  // ── Recalculate projected residual income with actual EMI ──
+  const projectedResidualIncomeActual = monthly_income - monthly_obligations - monthly_spends - emi;
+
   // ── Gates ──
-  const derived = { dti, ltv, ltvCap, spendToIncome, surplus, emi, stressEMI, stressRate, residualIncome };
+  const derived = {
+    dti,
+    totalDTI,
+    ltv,
+    ltvCap,
+    spendToIncome,
+    surplus,
+    currentSurplus,
+    projectedResidualIncome: projectedResidualIncomeActual,
+    emi,
+    stressEMI,
+    stressRate,
+    residualIncome,
+    creditRisk,
+    isFestiveSeason: isFestive,
+    isAgeAdjusted,
+    ltvOutOfRange: !ltvRangeValidation.isInRange,
+  };
+
   const gates = runGates(form, derived);
-  const decision = calcDecision(gates, past_defaults);
-  const riskReasons = buildRiskReasons(form, derived, gates);
+
+  // ── New Decision Engine ──
+  const decisionResult = evaluateFinalDecision(form, derived, gates);
+  let decision = decisionResult.decision;
+  
+  // Format decision for backward compatibility with tests
+  if (decision === "MANUAL_REVIEW") {
+    decision = "MANUAL REVIEW";
+  }
+
+  // ── Reason Codes ──
+  const reasonCodes = generateReasonCodes(form, derived, gates, decision);
+  const riskReasons = buildRiskReasons(form, derived, gates); // Legacy support
 
   // ── Totals ──
   const totalAmountPaid = emi * months;
-  const totalInterestPaid = totalAmountPaid - loan_amount;
+  const totalInterestPaid = totalAmountPaid - adjustedLoanAmount;
 
   // ── NIM ──
   const nimPct = finalRate - costOfFunds;
-  const nimAmount = (nimPct / 100 / 12) * loan_amount * months;
+  const nimAmount = (nimPct / 100 / 12) * adjustedLoanAmount * months;
 
   // ── Max safe loan ──
   const maxSafeLoanAmount = calcMaxSafeLoan(surplus, finalRate, months);
 
   // ── Amortization ──
-  const amortization = buildAmortization(loan_amount, finalRate, months, 12);
+  const amortization = buildAmortization(adjustedLoanAmount, finalRate, months, 12);
 
   return {
+    // applicant info
+    applicant_name,
+    product,
+    isFestiveSeason: isFestive,
+    occupationType,
+    
     // ratios
     dti,
+    totalDTI,
     spendToIncome,
     ltv,
     ltvCap,
+    ltvOutOfRange: !ltvRangeValidation.isInRange,
+    ltvRangeWarning: ltvRangeValidation.warning,
+    
+    // surplus & residual
     surplus,
+    currentSurplus,
     residualIncome,
+    projectedResidualIncome: projectedResidualIncomeActual,
+
+    // EMI (NEW)
+    existingEMI,
+    newEMI,
+    totalEMI,
+    totalObligations,
+    emi, // new EMI with rate applied
     stressEMI,
     stressRate,
+
+    // credit risk (NEW)
+    creditRisk,
+    activeOverdueAmount,
+    emiDefaultCount,
+    overdueEMICount,
+
+    // age adjustment (NEW)
+    applicantAge,
+    isAgeAdjusted,
+    adjustedLoanAmount,
+    ageAdjustmentReason: ageAdjustment.reason,
+
     // scoring
     scores,
     weightedScore,
+
     // rate
     rateBand,
     finalRate,
     costOfFunds,
+
     // EMI & totals
-    emi,
     totalAmountPaid,
     totalInterestPaid,
-    // decision
+
+    // decision (NEW)
     gates,
     decision,
-    riskReasons,
+    decisionReason: decisionResult.reason,
+    reasonCodes,
+    riskReasons, // legacy
+
+    // max safe loan
     maxSafeLoanAmount,
+
     // NIM
     nimPct,
     nimAmount,
+
     // amortization
     amortization,
   };

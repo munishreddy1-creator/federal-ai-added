@@ -1,5 +1,5 @@
 import React from "react";
-import { AlertTriangle, CheckCircle2, TrendingDown, IndianRupee } from "lucide-react";
+import { AlertTriangle, AlertCircle, CheckCircle2, TrendingDown, IndianRupee } from "lucide-react";
 
 function fmt(n) {
   if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)} Cr`;
@@ -10,36 +10,75 @@ function fmt(n) {
 
 export default function RiskPanel({ result, requestedLoanAmount }) {
   if (!result) return null;
-  const { riskReasons, maxSafeLoanAmount } = result;
+  const { reasonCodes, maxSafeLoanAmount, creditRisk } = result;
   const isOverLeveraged = requestedLoanAmount > maxSafeLoanAmount;
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Risk Reason Codes */}
+      {/* Decision Reason Codes */}
       <div className="bg-white rounded-xl shadow-lg p-5">
         <h3 className="flex items-center gap-2 text-base font-semibold mb-4">
           <AlertTriangle className="w-5 h-5 text-amber-500" />
-          Risk Reason Codes
+          Decision & Risk Factors
         </h3>
-        {riskReasons.length === 0 ? (
+        {reasonCodes && reasonCodes.length === 0 ? (
           <div className="flex items-center gap-3 p-4 rounded-lg bg-green-50 border border-green-200">
             <CheckCircle2 className="w-5 h-5 text-green-600 shrink-0" />
             <p className="text-sm text-green-700 font-medium">No risk flags identified. Profile looks healthy.</p>
           </div>
-        ) : (
+        ) : reasonCodes && reasonCodes.length > 0 ? (
           <div className="space-y-3">
-            {riskReasons.map((r) => (
-              <div key={r.code} className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
-                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-amber-800">{r.label}</p>
-                  <p className="text-xs text-amber-700 mt-0.5">{r.detail}</p>
+            {reasonCodes.map((r) => {
+              const bgColor =
+                r.severity === "CRITICAL"
+                  ? "bg-red-50 border-red-200"
+                  : r.severity === "HIGH"
+                  ? "bg-orange-50 border-orange-200"
+                  : r.severity === "MEDIUM"
+                  ? "bg-amber-50 border-amber-200"
+                  : "bg-blue-50 border-blue-200";
+              const textColor =
+                r.severity === "CRITICAL"
+                  ? "text-red-800"
+                  : r.severity === "HIGH"
+                  ? "text-orange-800"
+                  : r.severity === "MEDIUM"
+                  ? "text-amber-800"
+                  : "text-blue-800";
+              const icon =
+                r.severity === "CRITICAL" || r.severity === "HIGH" ? (
+                  <AlertTriangle className="w-4 h-4" />
+                ) : (
+                  <AlertCircle className="w-4 h-4" />
+                );
+
+              return (
+                <div key={r.code} className={`flex items-start gap-3 p-3 rounded-lg border ${bgColor}`}>
+                  <div className={textColor}>{icon}</div>
+                  <div className="flex-1">
+                    <p className={`text-sm font-semibold ${textColor}`}>{r.label}</p>
+                    <p className={`text-xs mt-0.5 ${textColor.replace("800", "700")}`}>{r.detail}</p>
+                  </div>
+                  <span className={`ml-auto shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded ${bgColor.replace("bg-", "bg-").replace("50", "100")} ${textColor}`}>
+                    {r.code}
+                  </span>
                 </div>
-                <span className="ml-auto shrink-0 text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded">
-                  {r.code}
-                </span>
-              </div>
-            ))}
+              );
+            })}
+          </div>
+        ) : null}
+
+        {/* Credit Risk Summary */}
+        {creditRisk?.hasCreditRisk && (
+          <div className="mt-4 p-4 rounded-lg bg-red-50 border border-red-200">
+            <p className="text-sm font-semibold text-red-800 mb-2">🚨 Active Credit Risk</p>
+            <ul className="text-sm text-red-700 space-y-1">
+              {creditRisk.activeOverdueAmount > 0 && (
+                <li>• Active Overdue: {fmt(creditRisk.activeOverdueAmount)}</li>
+              )}
+              {creditRisk.emiDefaultCount > 0 && <li>• EMI Defaults: {creditRisk.emiDefaultCount}</li>}
+              {creditRisk.overdueEMICount > 0 && <li>• Overdue EMIs: {creditRisk.overdueEMICount}</li>}
+            </ul>
           </div>
         )}
       </div>

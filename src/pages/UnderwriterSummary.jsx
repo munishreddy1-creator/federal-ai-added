@@ -90,23 +90,39 @@ export default function UnderwriterSummary() {
         {/* Summary Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: "Monthly EMI", value: fmt(result.emi) },
+            { label: "Monthly Income", value: fmt(form.monthly_income) },
+            { label: "Existing EMI", value: fmt(result.existingEMI) },
+            { label: "New EMI", value: fmt(result.emi) },
+            { label: "Total EMI", value: fmt(result.totalEMI || result.existingEMI + result.emi) },
+            { label: "Monthly Surplus", value: fmt(result.surplus) },
+            { label: "Projected Residual Income", value: fmt(result.projectedResidualIncome), highlight: result.projectedResidualIncome <= 0 ? "red" : "green" },
             { label: "Interest Rate", value: `${result.finalRate.toFixed(2)}%` },
             { label: "Credit Score", value: `${result.weightedScore.toFixed(1)}/100` },
-            { label: "Monthly Surplus", value: fmt(result.surplus) },
+            { label: "LTV Ratio", value: `${result.ltv.toFixed(1)}%` },
+            { label: "DTI Ratio", value: `${(result.dti * 100).toFixed(1)}%` },
+            { label: "Total DTI", value: `${(result.totalDTI * 100).toFixed(1)}%` },
+            { label: "NIM", value: `${result.nimPct.toFixed(2)}%` },
             { label: "Total Payable", value: fmt(result.totalAmountPaid) },
             { label: "Total Interest", value: fmt(result.totalInterestPaid) },
-            { label: "LTV Ratio", value: `${result.ltv.toFixed(1)}%` },
-            { label: "NIM", value: `${result.nimPct.toFixed(2)}%` },
+            { label: "Loan Amount", value: fmt(form.loan_amount) },
+            { label: "Collateral Value", value: fmt(form.collateral_value) },
           ].map((item) => (
-            <div key={item.label} className="bg-white rounded-xl shadow p-4">
+            <div key={item.label} className={`rounded-xl shadow p-4 ${
+              item.highlight === "red" ? "bg-red-50 border border-red-200" : 
+              item.highlight === "green" ? "bg-green-50 border border-green-200" : 
+              "bg-white"
+            }`}>
               <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{item.label}</p>
-              <p className="text-lg font-bold text-foreground">{item.value}</p>
+              <p className={`text-lg font-bold ${
+                item.highlight === "red" ? "text-red-700" : 
+                item.highlight === "green" ? "text-green-700" : 
+                "text-foreground"
+              }`}>{item.value}</p>
             </div>
           ))}
         </div>
 
-        {/* Applicant & Gate Checks side by side */}
+        {/* Applicant Details & Credit Summary side by side */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Applicant Details */}
           <div className="bg-white rounded-xl shadow-lg p-5">
@@ -119,13 +135,15 @@ export default function UnderwriterSummary() {
                 ["Product", form.product],
                 ["Tenure", `${form.tenure_months} months`],
                 ["CIBIL Score", form.cibil_score],
+                ["Occupation", form.occupationType || "—"],
+                ["Age", form.applicantAge ? `${form.applicantAge} years` : "—"],
                 ["Monthly Income", fmt(form.monthly_income)],
                 ["Monthly Obligations", fmt(form.monthly_obligations)],
+                ["Existing EMI", fmt(result.existingEMI || 0)],
                 ["Monthly Spends", fmt(form.monthly_spends)],
                 ["Savings Balance", fmt(form.savings_balance)],
                 ["Loan Amount", fmt(form.loan_amount)],
                 ["Collateral Value", fmt(form.collateral_value)],
-                ["Past Defaults", form.past_defaults],
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between py-1 border-b border-gray-50">
                   <span className="text-muted-foreground font-medium">{k}</span>
@@ -135,10 +153,42 @@ export default function UnderwriterSummary() {
             </div>
           </div>
 
+          {/* Credit Summary */}
+          <div className="bg-white rounded-xl shadow-lg p-5">
+            <h3 className="flex items-center gap-2 font-semibold text-base mb-4">
+              <ShieldCheck className="w-5 h-5 text-blue-700" /> Credit Summary
+            </h3>
+            <div className="space-y-2 text-sm">
+              {[
+                ["Past Defaults", form.past_defaults, form.past_defaults > 0 ? "amber" : "white"],
+                ...(form.activeOverdueAmount > 0 ? [["Active Overdue", fmt(form.activeOverdueAmount), "red"]] : []),
+                ...(form.emiDefaultCount > 0 ? [["EMI Defaults", form.emiDefaultCount, "orange"]] : []),
+                ...(form.overdueEMICount > 0 ? [["Overdue EMIs", form.overdueEMICount, "orange"]] : []),
+                ["Current Residual Income", fmt(result.currentSurplus), result.currentSurplus > 0 ? "green" : "red"],
+                ["Projected Residual Income", fmt(result.projectedResidualIncome), result.projectedResidualIncome > 0 ? "green" : "red"],
+              ].map(([k, v, color]) => {
+                const bgClass = color === "red" ? "bg-red-50 border-red-200" : 
+                               color === "green" ? "bg-green-50 border-green-200" : 
+                               color === "amber" ? "bg-amber-50 border-amber-200" : 
+                               color === "orange" ? "bg-orange-50 border-orange-200" : "bg-white";
+                const textClass = color === "red" ? "text-red-700" : 
+                                 color === "green" ? "text-green-700" : 
+                                 color === "amber" ? "text-amber-700" : 
+                                 color === "orange" ? "text-orange-700" : "text-foreground";
+                return (
+                  <div key={k} className={`flex justify-between py-2 px-2 rounded border ${bgClass}`}>
+                    <span className="text-muted-foreground font-medium">{k}</span>
+                    <span className={`font-semibold ${textClass}`}>{v}</span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           {/* Gate Checks */}
           <div className="bg-white rounded-xl shadow-lg p-5">
             <h3 className="flex items-center gap-2 font-semibold text-base mb-4">
-              <ShieldCheck className="w-5 h-5 text-blue-700" /> Gate Checks
+              <ShieldCheck className="w-5 h-5 text-blue-700" /> Gate Checks & Decision
             </h3>
             <div className="space-y-2">
               {Object.entries(result.gates).map(([key, status]) => (
@@ -147,6 +197,16 @@ export default function UnderwriterSummary() {
                   <GateBadge status={status} />
                 </div>
               ))}
+            </div>
+            
+            {/* Key Metrics for Decision */}
+            <div className="mt-4 pt-4 border-t border-gray-100 space-y-2 text-sm">
+              {result.creditRisk?.hasCreditRisk && (
+                <div className="flex justify-between p-2 rounded bg-red-50 text-red-700 border border-red-200">
+                  <span className="font-medium">⚠️ Credit Risk</span>
+                  <span className="font-semibold">YES</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -183,20 +243,36 @@ export default function UnderwriterSummary() {
           </div>
         </div>
 
-        {/* Risk Reasons */}
-        {result.riskReasons.length > 0 && (
+        {/* Decision Reason Codes & Risk Factors */}
+        {(result.reasonCodes && result.reasonCodes.length > 0) && (
           <div className="bg-white rounded-xl shadow-lg p-5">
-            <h3 className="font-semibold text-base mb-4 text-amber-700">Risk Reason Codes</h3>
+            <h3 className="font-semibold text-base mb-4 text-amber-700">📋 Decision Reason Codes & Risk Factors</h3>
             <div className="space-y-3">
-              {result.riskReasons.map((r) => (
-                <div key={r.code} className="flex items-start gap-3 p-3 rounded-lg bg-amber-50 border border-amber-200">
-                  <span className="text-[10px] font-bold bg-amber-100 text-amber-700 border border-amber-300 px-1.5 py-0.5 rounded shrink-0 mt-0.5">{r.code}</span>
-                  <div>
-                    <p className="text-sm font-semibold text-amber-800">{r.label}</p>
-                    <p className="text-xs text-amber-700 mt-0.5">{r.detail}</p>
+              {result.reasonCodes.map((r) => {
+                const bgColor =
+                  r.severity === "CRITICAL" ? "bg-red-50 border-red-200" :
+                  r.severity === "HIGH" ? "bg-orange-50 border-orange-200" :
+                  r.severity === "MEDIUM" ? "bg-amber-50 border-amber-200" :
+                  "bg-blue-50 border-blue-200";
+                return (
+                  <div key={r.code} className={`flex items-start gap-3 p-3 rounded-lg border ${bgColor}`}>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${bgColor.replace("50", "100")}`}>
+                      {r.code}
+                    </span>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold">{r.label}</p>
+                      <p className="text-xs mt-0.5">{r.detail}</p>
+                    </div>
+                    <span className={`text-xs font-semibold shrink-0 px-2 py-1 rounded whitespace-nowrap ${
+                      r.severity === "CRITICAL" || r.severity === "HIGH" ? "bg-red-100 text-red-700" :
+                      r.severity === "MEDIUM" ? "bg-amber-100 text-amber-700" :
+                      "bg-blue-100 text-blue-700"
+                    }`}>
+                      {r.severity}
+                    </span>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

@@ -164,7 +164,8 @@ const testCases = [
       dti: 0,
       spendToIncome: 0,
       surplus: 0,
-      decision: 'APPROVE',
+      decision: 'REJECT',
+      decisionReason: 'AFFORDABILITY_FAILURE',
     },
   },
 ];

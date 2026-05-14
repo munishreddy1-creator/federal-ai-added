@@ -15,7 +15,7 @@ import PreviousLoanCheck from "../components/loan/previousloancheck";
 
 const DEFAULT_FORM = {
   product: "Housing Loan",
-  season: "Normal",
+  isFestiveSeason: false,
   tenure_months: 60,
   cibil_score: 700,
   monthly_income: 200000,
@@ -26,6 +26,15 @@ const DEFAULT_FORM = {
   loan_amount: 1000000,
   collateral_value: 1500000,
   applicant_name: "",
+  // NEW FIELDS
+  applicantAge: null,
+  occupationType: "SALARIED",
+  existingEMI: 0,
+  emiDefaultCount: 0,
+  overdueEMICount: 0,
+  activeOverdueAmount: 0,
+  customCostOfFunds: null,
+  stressMultiplier: null,
 };
 
 export default function LoanCalculator() {
@@ -85,7 +94,7 @@ export default function LoanCalculator() {
 
             {/* Gate Checks + Score Breakdown */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <GateChecks gates={result.gates} decision={result.decision} />
+              <GateChecks gates={result.gates} decision={result.decision} result={result} />
               <ScoreBreakdown scores={result.scores} weightedScore={result.weightedScore} />
             </div>
 
