@@ -4,7 +4,7 @@ import { Shield, ShieldCheck, ShieldAlert, ShieldX, AlertTriangle } from "lucide
 const gateLabels = {
   cibil: "CIBIL Score Gate",
   spend: "Spend-to-Income Gate",
-  dti: "DTI Ratio Gate",
+  dti: "Total DTI Gate",
   ltv: "LTV Cap Gate",
   emi: "EMI Affordability Gate",
   stress: "Stress Test (Rate +2%)",

@@ -254,6 +254,44 @@ const testCases = [
       },
     ],
   },
+  {
+    name: 'DTI Gate Uses Existing EMI + Proposed EMI Against Income',
+    form: {
+      product: 'Housing Loan',
+      season: 'Normal',
+      tenure_months: 60,
+      cibil_score: 780,
+      monthly_income: 100000,
+      monthly_obligations: 0,
+      past_defaults: 0,
+      monthly_spends: 10000,
+      savings_balance: 300000,
+      loan_amount: 500000,
+      collateral_value: 1000000,
+      existingEMI: 40000,
+      occupationType: 'SALARIED',
+    },
+    expected: {
+      dti: 0,
+      totalDTI: 0.50323,
+      decision: 'REJECT',
+      decisionReason: 'GATE_REJECTION',
+    },
+    checks: [
+      {
+        label: 'Current DTI alone is below threshold',
+        validate: (result) => result.dti < 0.5,
+      },
+      {
+        label: 'Total DTI crosses 50% with existing + proposed EMI',
+        validate: (result) => result.totalDTI > 0.5,
+      },
+      {
+        label: 'DTI gate rejects when total DTI crosses 50%',
+        validate: (result) => result.gates.dti === 'REJECT',
+      },
+    ],
+  },
 ];
 
 // ─── Test Runner ───────────────────────────────────────────────────────────────

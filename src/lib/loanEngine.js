@@ -212,7 +212,7 @@ function finalRateFromScore(band, weightedScore, season) {
 // ─── Gate Checks ──────────────────────────────────────────────────────────────
 function runGates(form, derived) {
   const { cibil_score, past_defaults } = form;
-  const { dti, ltv, ltvCap, spendToIncome, surplus, emi, stressEMI, projectedResidualIncome } = derived;
+  const { totalDTI, ltv, ltvCap, spendToIncome, surplus, emi, stressEMI, projectedResidualIncome } = derived;
 
   const gates = {};
 
@@ -227,8 +227,8 @@ function runGates(form, derived) {
   else gates.spend = "REJECT";
 
   // DTI gate
-  if (dti <= GATE_THRESHOLDS.dti.pass) gates.dti = "PASS";
-  else if (dti <= GATE_THRESHOLDS.dti.manual) gates.dti = "MANUAL";
+  if (totalDTI <= GATE_THRESHOLDS.dti.pass) gates.dti = "PASS";
+  else if (totalDTI <= GATE_THRESHOLDS.dti.manual) gates.dti = "MANUAL";
   else gates.dti = "REJECT";
 
   // LTV gate
@@ -322,7 +322,7 @@ function calcDecision(gates, past_defaults) {
 export function generateReasonCodes(form, derived, gates, decision) {
   const reasons = [];
   const { cibil_score, past_defaults } = form;
-  const { dti, ltv, ltvCap, spendToIncome, surplus, emi, stressEMI, residualIncome, creditRisk, isFestiveSeason, isAgeAdjusted } = derived;
+  const { dti, totalDTI, ltv, ltvCap, spendToIncome, surplus, emi, stressEMI, residualIncome, creditRisk, isFestiveSeason, isAgeAdjusted } = derived;
 
   // Credit Risk Reasons (HIGHEST PRIORITY)
   if (creditRisk?.hasCreditRisk) {
@@ -370,7 +370,7 @@ export function generateReasonCodes(form, derived, gates, decision) {
     reasons.push({
       code: "RC_HIGH_DTI",
       label: "High Debt-to-Income Ratio",
-      detail: `DTI of ${(dti * 100).toFixed(1)}% exceeds the ${GATE_THRESHOLDS.dti.pass * 100}% guideline.`,
+      detail: `Total DTI of ${(totalDTI * 100).toFixed(1)}% exceeds the ${GATE_THRESHOLDS.dti.pass * 100}% guideline.`,
       severity: "MEDIUM",
       impact: gates.dti === "REJECT" ? "REJECT" : "MANUAL_REVIEW",
     });
@@ -475,7 +475,7 @@ function buildRiskReasons(form, derived, gates) {
     reasons.push({
       code: "RC02",
       label: "High Debt-to-Income Ratio",
-      detail: `DTI of ${(derived.dti * 100).toFixed(1)}% exceeds the 40% guideline.`,
+      detail: `Total DTI of ${(derived.totalDTI * 100).toFixed(1)}% exceeds the 50% guideline.`,
     });
   }
   if (gates.ltv !== "PASS") {

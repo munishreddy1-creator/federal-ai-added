@@ -9,8 +9,8 @@ export default function DerivedMetrics({ result }) {
   if (!result) return null;
 
   const metrics = [
-    { label: "DTI Ratio", value: `${(result.dti * 100).toFixed(1)}%`, desc: "Obligations / Income" },
-    { label: "Total DTI", value: `${(result.totalDTI * 100).toFixed(1)}%`, desc: "Including new EMI" },
+    { label: "Current DTI", value: `${(result.dti * 100).toFixed(1)}%`, desc: "Obligations / Income" },
+    { label: "Total DTI", value: `${(result.totalDTI * 100).toFixed(1)}%`, desc: "Existing + new EMI / income" },
     { label: "Spend-to-Income", value: `${(result.spendToIncome * 100).toFixed(1)}%`, desc: "Spends / Income" },
     { label: "LTV Ratio", value: `${result.ltv.toFixed(1)}%`, desc: `Cap: ${result.ltvCap}%` },
     {

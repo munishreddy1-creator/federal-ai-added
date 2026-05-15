@@ -21,7 +21,7 @@ function GateBadge({ status }) {
 const gateLabels = {
   cibil: "CIBIL Score Gate",
   spend: "Spend-to-Income Gate",
-  dti: "DTI Ratio Gate",
+  dti: "Total DTI Gate",
   ltv: "LTV Cap Gate",
   emi: "EMI Affordability Gate",
   stress: "Stress Test (Rate +2%)",
@@ -99,7 +99,7 @@ export default function UnderwriterSummary() {
             { label: "Interest Rate", value: `${result.finalRate.toFixed(2)}%` },
             { label: "Credit Score", value: `${result.weightedScore.toFixed(1)}/100` },
             { label: "LTV Ratio", value: `${result.ltv.toFixed(1)}%` },
-            { label: "DTI Ratio", value: `${(result.dti * 100).toFixed(1)}%` },
+            { label: "Current DTI", value: `${(result.dti * 100).toFixed(1)}%` },
             { label: "Total DTI", value: `${(result.totalDTI * 100).toFixed(1)}%` },
             { label: "NIM", value: `${result.nimPct.toFixed(2)}%` },
             { label: "Total Payable", value: fmt(result.totalAmountPaid) },
