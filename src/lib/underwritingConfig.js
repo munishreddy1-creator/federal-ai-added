@@ -12,6 +12,12 @@ export const RATE_BANDS = {
     { min: 650, max: 699, rate: { min: 10.5, max: 12.0 } },
     { min: 300, max: 649, rate: { min: 12.0, max: 14.0 } },
   ],
+  "Loan Against Property": [
+    { min: 750, max: 900, rate: { min: 8.15, max: 10.5 } },
+    { min: 700, max: 749, rate: { min: 8.15, max: 10.5 } },
+    { min: 650, max: 699, rate: { min: 8.15, max: 10.5 } },
+    { min: 300, max: 649, rate: { min: 8.15, max: 10.5 } },
+  ],
   "Auto Loan": [
     { min: 750, max: 900, rate: { min: 9.0, max: 10.0 } },
     { min: 700, max: 749, rate: { min: 10.0, max: 11.5 } },
@@ -29,6 +35,7 @@ export const RATE_BANDS = {
 // ─── LTV CAPS BY PRODUCT ──────────────────────────────────────────────────
 export const LTV_CAPS = {
   "Housing Loan": 80,
+  "Loan Against Property": 75,
   "Auto Loan": {
     normal: 85,
     festive: 95,
@@ -46,12 +53,14 @@ export const LTV_RANGE_RULES = {
 // ─── COST OF FUNDS (configurable) ──────────────────────────────────────────
 export const COST_OF_FUNDS_OPTIONS = {
   "Housing Loan": [5.5, 6.0],
+  "Loan Against Property": [6.0, 6.5],
   "Auto Loan": [7.0, 5.6],
   "Gold Loan": [6.0, 5.5],
 };
 
 export const DEFAULT_COST_OF_FUNDS = {
   "Housing Loan": 5.5,
+  "Loan Against Property": 6.0,
   "Auto Loan": 7.0,
   "Gold Loan": 6.0,
 };

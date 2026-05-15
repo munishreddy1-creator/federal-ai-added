@@ -32,6 +32,13 @@ export function calcEMI(principal, annualRate, months) {
   return Math.round(emi);
 }
 
+function calcPrincipalFromEMI(emi, annualRate, months) {
+  if (emi <= 0 || months <= 0) return 0;
+  if (annualRate === 0) return emi * months;
+  const r = annualRate / 100 / 12;
+  return (emi * (Math.pow(1 + r, months) - 1)) / (r * Math.pow(1 + r, months));
+}
+
 // ─── Aggregate Existing EMIs ──────────────────────────────────────────────────
 /**
  * Calculate total existing EMI from existing loans array
@@ -156,6 +163,40 @@ function getRateBand(product, cibil) {
     if (cibil >= band.min && cibil <= band.max) return band.rate;
   }
   return { min: 14, max: 16 };
+}
+
+function resolveFinalRate(band, weightedScore, season, customInterestRate = null) {
+  if (customInterestRate !== null && customInterestRate !== undefined && customInterestRate !== "") {
+    const requestedRate = Number(customInterestRate);
+    const appliedRate = Math.min(Math.max(requestedRate, band.min), band.max);
+    return {
+      rate: appliedRate,
+      validation: {
+        isValid: requestedRate >= band.min && requestedRate <= band.max,
+        requestedRate,
+        appliedRate,
+        min: band.min,
+        max: band.max,
+        message:
+          requestedRate >= band.min && requestedRate <= band.max
+            ? null
+            : `Interest rate adjusted to allowed range ${band.min.toFixed(2)}%-${band.max.toFixed(2)}%.`,
+      },
+    };
+  }
+
+  const rate = finalRateFromScore(band, weightedScore, season);
+  return {
+    rate,
+    validation: {
+      isValid: true,
+      requestedRate: null,
+      appliedRate: rate,
+      min: band.min,
+      max: band.max,
+      message: null,
+    },
+  };
 }
 
 function finalRateFromScore(band, weightedScore, season) {
@@ -488,9 +529,46 @@ function calcMaxSafeLoan(surplus, annualRate, months) {
   // Max loan where stress EMI (at +2%) ≤ 85% of surplus
   const stressRate = annualRate + 2;
   const maxStressEMI = surplus * 0.85;
-  const r = stressRate / 100 / 12;
-  if (r === 0) return maxStressEMI * months;
-  return (maxStressEMI * (Math.pow(1 + r, months) - 1)) / (r * Math.pow(1 + r, months));
+  return calcPrincipalFromEMI(maxStressEMI, stressRate, months);
+}
+
+function minPositiveAmount(...amounts) {
+  return Math.max(0, Math.min(...amounts.map((amount) => Math.max(0, Number.isFinite(amount) ? amount : 0))));
+}
+
+function calculateEligibilityCaps({
+  requestedLoanAmount,
+  collateralValue,
+  ltvCap,
+  surplus,
+  finalRate,
+  months,
+  fiorSanction,
+  adjustedLoanAmount,
+}) {
+  const ltvEligibleLoan = collateralValue > 0 ? collateralValue * (ltvCap / 100) : 0;
+  const affordabilityEligibleLoan = calcMaxSafeLoan(surplus, finalRate, months);
+  const underwritingEligibleLoan = adjustedLoanAmount;
+  const fiorEligibleLoan =
+    fiorSanction.status === "REJECTED" || fiorSanction.status === "MANUAL_REVIEW"
+      ? 0
+      : fiorSanction.approvedLoanAmount;
+  const maxEligibleLoan = minPositiveAmount(
+    requestedLoanAmount,
+    ltvEligibleLoan,
+    affordabilityEligibleLoan,
+    underwritingEligibleLoan,
+    fiorEligibleLoan
+  );
+
+  return {
+    requestedLoanAmount,
+    ltvEligibleLoan: Math.round(ltvEligibleLoan),
+    affordabilityEligibleLoan: Math.round(affordabilityEligibleLoan),
+    underwritingEligibleLoan: Math.round(underwritingEligibleLoan),
+    fiorEligibleLoan: Math.round(fiorEligibleLoan),
+    maxEligibleLoan: Math.round(maxEligibleLoan),
+  };
 }
 
 // ─── Main Evaluate Function ───────────────────────────────────────────────────
@@ -520,6 +598,7 @@ export function evaluate(form) {
     applicantAge = null,
     occupationType = "SALARIED",
     customCostOfFunds = null,
+    customInterestRate = null,
     stressMultiplier = null,
     applicant_name = "",
   } = form;
@@ -592,7 +671,9 @@ export function evaluate(form) {
 
   // ── Rate ──
   const rateBand = getRateBand(product, cibil_score);
-  const finalRate = finalRateFromScore(rateBand, weightedScore, isFestive ? "Festival" : "Normal");
+  const rateResolution = resolveFinalRate(rateBand, weightedScore, isFestive ? "Festival" : "Normal", customInterestRate);
+  const finalRate = rateResolution.rate;
+  const interestRateValidation = rateResolution.validation;
   const stressRate = finalRate + STRESS_CONFIG.rateShock;
 
   // ── EMI with rate applied ──
@@ -621,21 +702,19 @@ export function evaluate(form) {
     months,
   });
 
-  // Determine approved loan amount based on FIOR sanction
-  let approvedLoanAmount = adjustedLoanAmount;
-  let maxLoanProvided = adjustedLoanAmount;
-  let fiorAdjustmentReason = null;
-
-  if (fiorSanction.status === "APPROVED_WITH_REDUCTION") {
-    approvedLoanAmount = fiorSanction.approvedLoanAmount;
-    maxLoanProvided = fiorSanction.approvedLoanAmount;
-    fiorAdjustmentReason = fiorSanction.remarks;
-  } else if (fiorSanction.status === "MANUAL_REVIEW" || fiorSanction.status === "REJECTED") {
-    approvedLoanAmount = 0;
-    maxLoanProvided = 0;
-  } else {
-    maxLoanProvided = adjustedLoanAmount;
-  }
+  const eligibility = calculateEligibilityCaps({
+    requestedLoanAmount: loan_amount,
+    collateralValue: collateral_value,
+    ltvCap,
+    surplus,
+    finalRate,
+    months,
+    fiorSanction,
+    adjustedLoanAmount,
+  });
+  const approvedLoanAmount = eligibility.maxEligibleLoan;
+  const maxLoanProvided = eligibility.maxEligibleLoan;
+  const fiorAdjustmentReason = fiorSanction.reductionApplied ? fiorSanction.remarks : null;
 
   // ── Gates ──
   const derived = {
@@ -745,6 +824,8 @@ export function evaluate(form) {
     // rate
     rateBand,
     finalRate,
+    selectedInterestRate: finalRate,
+    interestRateValidation,
     costOfFunds,
 
     // EMI & totals
@@ -763,6 +844,12 @@ export function evaluate(form) {
     fiorSanction,
     approvedLoanAmount,
     maxLoanProvided,
+    maxEligibleLoan: eligibility.maxEligibleLoan,
+    ltvEligibleLoan: eligibility.ltvEligibleLoan,
+    affordabilityEligibleLoan: eligibility.affordabilityEligibleLoan,
+    underwritingEligibleLoan: eligibility.underwritingEligibleLoan,
+    fiorEligibleLoan: eligibility.fiorEligibleLoan,
+    requestedLoanAmount: eligibility.requestedLoanAmount,
     fiorAdjustmentReason,
     finalEmi,
 

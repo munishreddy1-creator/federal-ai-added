@@ -104,19 +104,24 @@ export default function UnderwriterSummary() {
             { label: "NIM", value: `${result.nimPct.toFixed(2)}%` },
             { label: "Total Payable", value: fmt(result.totalAmountPaid) },
             { label: "Total Interest", value: fmt(result.totalInterestPaid) },
-            { label: "Requested Loan", value: fmt(form.loan_amount) },
-            { label: "MAX LOAN PROVIDED", value: fmt(result.maxLoanProvided || result.approvedLoanAmount || form.loan_amount), highlight: result.maxLoanProvided < form.loan_amount ? "amber" : "green" },
-            { label: "Collateral Value", value: fmt(form.collateral_value) },
+            { label: "Requested Loan Amount", value: fmt(result.requestedLoanAmount) },
+            { label: "Property / Pledged Value", value: fmt(form.collateral_value) },
+            { label: "LTV Eligible Amount", value: fmt(result.ltvEligibleLoan) },
+            { label: "Affordability Eligible Amount", value: fmt(result.affordabilityEligibleLoan) },
+            { label: "FIOR Eligible Amount", value: fmt(result.fiorEligibleLoan) },
+            { label: "MAX LOAN PROVIDED", value: fmt(result.maxLoanProvided), highlight: result.maxLoanProvided < result.requestedLoanAmount ? "amber" : "green" },
           ].map((item) => (
             <div key={item.label} className={`rounded-xl shadow p-4 ${
               item.highlight === "red" ? "bg-red-50 border border-red-200" : 
               item.highlight === "green" ? "bg-green-50 border border-green-200" : 
+              item.highlight === "amber" ? "bg-amber-50 border border-amber-200" :
               "bg-white"
             }`}>
               <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{item.label}</p>
               <p className={`text-lg font-bold ${
                 item.highlight === "red" ? "text-red-700" : 
                 item.highlight === "green" ? "text-green-700" : 
+                item.highlight === "amber" ? "text-amber-700" :
                 "text-foreground"
               }`}>{item.value}</p>
             </div>
@@ -143,9 +148,12 @@ export default function UnderwriterSummary() {
                 ["Existing EMI", fmt(result.existingEMI || 0)],
                 ["Monthly Spends", fmt(form.monthly_spends)],
                 ["Savings Balance", fmt(form.savings_balance)],
-                ["Requested Loan", fmt(form.loan_amount)],
-                ["MAX LOAN PROVIDED", fmt(result.maxLoanProvided || result.approvedLoanAmount || form.loan_amount)],
-                ["Collateral Value", fmt(form.collateral_value)],
+                ["Requested Loan Amount", fmt(result.requestedLoanAmount)],
+                ["Property / Pledged Value", fmt(form.collateral_value)],
+                ["LTV Eligible Amount", fmt(result.ltvEligibleLoan)],
+                ["Affordability Eligible Amount", fmt(result.affordabilityEligibleLoan)],
+                ["FIOR Eligible Amount", fmt(result.fiorEligibleLoan)],
+                ["MAX LOAN PROVIDED", fmt(result.maxLoanProvided)],
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between py-1 border-b border-gray-50">
                   <span className="text-muted-foreground font-medium">{k}</span>

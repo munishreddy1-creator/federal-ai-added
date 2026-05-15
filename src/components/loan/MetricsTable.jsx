@@ -39,6 +39,12 @@ export default function MetricsTable({ form, result }) {
     { metric: "Existing EMI", value: fmt(result.existingEMI) },
     { metric: "New EMI", value: fmt(result.emi) },
     { metric: "Total EMI", value: fmt(result.totalEMI) },
+    { metric: "Requested Loan Amount", value: fmt(result.requestedLoanAmount) },
+    { metric: "LTV Eligible Amount", value: fmt(result.ltvEligibleLoan) },
+    { metric: "Affordability Eligible Amount", value: fmt(result.affordabilityEligibleLoan) },
+    { metric: "FIOR Eligible Amount", value: fmt(result.fiorEligibleLoan) },
+    { metric: "Underwriting Eligible Amount", value: fmt(result.underwritingEligibleLoan) },
+    { metric: "MAX LOAN PROVIDED", value: fmt(result.maxLoanProvided), highlight: result.maxLoanProvided < result.requestedLoanAmount ? "amber" : "green" },
     { metric: "EMI Affordability", value: `${fmt(result.emi)} / ${fmt(result.surplus)} surplus`, gate: <GateBadge status={result.gates.emi} /> },
     { metric: "Monthly Surplus", value: fmt(result.surplus) },
     { metric: "Residual Income (Current)", value: fmt(result.residualIncome) },
@@ -80,8 +86,8 @@ export default function MetricsTable({ form, result }) {
           </thead>
           <tbody>
             {rows.map((row, i) => {
-              const bgColor = row.highlight === "red" ? "bg-red-50" : row.highlight === "green" ? "bg-green-50" : "hover:bg-slate-50";
-              const textColor = row.highlight === "red" ? "text-red-700" : row.highlight === "green" ? "text-green-700" : "text-foreground";
+              const bgColor = row.highlight === "red" ? "bg-red-50" : row.highlight === "green" ? "bg-green-50" : row.highlight === "amber" ? "bg-amber-50" : "hover:bg-slate-50";
+              const textColor = row.highlight === "red" ? "text-red-700" : row.highlight === "green" ? "text-green-700" : row.highlight === "amber" ? "text-amber-700" : "text-foreground";
               return (
                 <tr key={i} className={`border-t border-gray-50 ${bgColor} transition-colors`}>
                   <td className="px-4 py-2.5 font-medium text-muted-foreground">{row.metric}</td>

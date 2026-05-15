@@ -37,6 +37,12 @@ export default function DerivedMetrics({ result }) {
       desc: `At ${result.stressRate?.toFixed(2)}% rate`,
       highlight: result.stressEMI > result.surplus ? "red" : "neutral",
     },
+    {
+      label: "Max Loan Provided",
+      value: fmt(result.maxLoanProvided),
+      desc: "Minimum of eligibility caps",
+      highlight: result.maxLoanProvided < result.requestedLoanAmount ? "amber" : "green",
+    },
   ];
 
   return (

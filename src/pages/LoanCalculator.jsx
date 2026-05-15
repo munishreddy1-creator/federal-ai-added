@@ -34,6 +34,7 @@ const DEFAULT_FORM = {
   overdueEMICount: 0,
   activeOverdueAmount: 0,
   customCostOfFunds: null,
+  customInterestRate: null,
   stressMultiplier: null,
 };
 

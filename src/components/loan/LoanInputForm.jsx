@@ -68,7 +68,7 @@ function CheckboxField({ label, checked, onChange, info }) {
 }
 
 function collateralLabel(product) {
-  if (product === "Housing Loan") return "Property Value (₹)";
+  if (product === "Housing Loan" || product === "Loan Against Property") return "Pledged Property Value (₹)";
   if (product === "Auto Loan") return "On-Road Price (₹)";
   return "Collateral Value (₹)";
 }
@@ -95,6 +95,7 @@ export default function LoanInputForm({ form, setForm, onCalculate }) {
             onChange={(v) => update("product", v)}
             options={[
               { value: "Housing Loan", label: "Housing Loan" },
+              { value: "Loan Against Property", label: "Loan Against Property" },
               { value: "Auto Loan", label: "Auto Loan" },
               { value: "Gold Loan", label: "Gold Loan" },
             ]}
@@ -223,6 +224,14 @@ export default function LoanInputForm({ form, setForm, onCalculate }) {
                       info="For NIM calculation"
                     />
                   )}
+                  <NumField
+                    label="Custom Interest Rate (%)"
+                    value={form.customInterestRate}
+                    onChange={(v) => update("customInterestRate", v)}
+                    suffix="%"
+                    placeholder={form.product === "Loan Against Property" ? "8.15 - 10.50" : "Auto"}
+                    info={form.product === "Loan Against Property" ? "Allowed LAP range: 8.15% to 10.50%" : "Optional override within product band"}
+                  />
                 </div>
               </div>
 

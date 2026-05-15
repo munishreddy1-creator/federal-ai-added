@@ -486,6 +486,99 @@ assert(
 );
 
 // ───────────────────────────────────────────────────────────────────────────
+// TEST 11: LAP LTV, EMI, RATE, AND MAX LOAN PROVIDED
+// ───────────────────────────────────────────────────────────────────────────
+
+console.log("\n📋 Test Suite 11: LAP LTV, EMI, Rate, and Max Loan Provided");
+console.log("─".repeat(60));
+
+const lapForm = {
+  product: "Loan Against Property",
+  tenure_months: 120,
+  cibil_score: 780,
+  monthly_income: 500000,
+  monthly_obligations: 50000,
+  past_defaults: 0,
+  monthly_spends: 75000,
+  savings_balance: 1000000,
+  loan_amount: 10000000,
+  collateral_value: 10000000,
+  existing_loans: [{ emi: 10000 }, { emi: 15000 }, { emi: 5000 }],
+  occupationType: "SALARIED",
+  customInterestRate: 9.25,
+};
+
+const lapResult = evaluate(lapForm);
+assert(
+  lapResult.ltvCap === 75,
+  "LAP Uses 75% LTV Cap",
+  `Expected 75, got ${lapResult.ltvCap}`
+);
+
+assert(
+  lapResult.ltvEligibleLoan === 7500000,
+  "LAP Pledged Value Calculates LTV Eligible Amount",
+  `Expected ${fmt(7500000)}, got ${fmt(lapResult.ltvEligibleLoan)}`
+);
+
+assert(
+  lapResult.existingEMI === 30000,
+  "Existing Loan EMI Array Aggregates to Total Existing EMI",
+  `Expected ${fmt(30000)}, got ${fmt(lapResult.existingEMI)}`
+);
+
+assert(
+  lapResult.totalEMI === lapResult.existingEMI + lapResult.emi,
+  "LAP Total EMI Adds Existing and New EMI",
+  `Expected ${fmt(lapResult.existingEMI + lapResult.emi)}, got ${fmt(lapResult.totalEMI)}`
+);
+
+assert(
+  Math.abs(lapResult.finalRate - 9.25) < 0.001 && lapResult.interestRateValidation.isValid,
+  "LAP Custom Interest Rate Within Range Is Applied",
+  `Expected 9.25%, got ${lapResult.finalRate}%`
+);
+
+assert(
+  lapResult.maxLoanProvided === Math.min(
+    lapResult.requestedLoanAmount,
+    lapResult.ltvEligibleLoan,
+    lapResult.affordabilityEligibleLoan,
+    lapResult.underwritingEligibleLoan,
+    lapResult.fiorEligibleLoan
+  ),
+  "MAX LOAN PROVIDED Uses Minimum Eligibility Cap",
+  `Max loan: ${fmt(lapResult.maxLoanProvided)}`
+);
+
+assert(
+  lapResult.maxLoanProvided <= lapResult.ltvEligibleLoan,
+  "LAP Final Sanction Never Exceeds LTV Cap",
+  `Max loan: ${fmt(lapResult.maxLoanProvided)}, LTV cap: ${fmt(lapResult.ltvEligibleLoan)}`
+);
+
+const lapInvalidRate = evaluate({ ...lapForm, customInterestRate: 12 });
+assert(
+  lapInvalidRate.finalRate === 10.5 && lapInvalidRate.interestRateValidation.isValid === false,
+  "LAP Interest Rate Is Validated and Capped to Product Range",
+  `Expected 10.50%, got ${lapInvalidRate.finalRate}%`
+);
+
+const lapPropertyEdit = evaluate({ ...lapForm, collateral_value: 8000000 });
+assert(
+  lapPropertyEdit.ltvEligibleLoan === 6000000 && lapPropertyEdit.maxLoanProvided <= 6000000,
+  "KPI Source Updates When Pledged Property Value Changes",
+  `LTV eligible: ${fmt(lapPropertyEdit.ltvEligibleLoan)}, max: ${fmt(lapPropertyEdit.maxLoanProvided)}`
+);
+
+const lapEmploymentEdit = evaluate({ ...lapForm, occupationType: "SELF_EMPLOYED" });
+assert(
+  lapEmploymentEdit.fiorSanction.status !== undefined && lapEmploymentEdit.maxLoanProvided <= lapEmploymentEdit.ltvEligibleLoan,
+  "KPI Source Recalculates When Employment Type Changes",
+  `Status: ${lapEmploymentEdit.fiorSanction.status}, max: ${fmt(lapEmploymentEdit.maxLoanProvided)}`
+);
+
+// ───────────────────────────────────────────────────────────────────────────
 // SUMMARY
 // ───────────────────────────────────────────────────────────────────────────
 
