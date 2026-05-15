@@ -51,7 +51,6 @@ export default function UnderwriterSummary() {
   }
 
   const { form, result } = data;
-  const isRejected = result.decision === "REJECT";
   const decisionColor = result.decision === "APPROVE" ? "bg-green-600" : result.decision === "REJECT" ? "bg-red-600" : "bg-amber-600";
   const decisionBorder = result.decision === "APPROVE" ? "border-green-500" : result.decision === "REJECT" ? "border-red-500" : "border-amber-500";
 
@@ -88,54 +87,44 @@ export default function UnderwriterSummary() {
           </span>
         </div>
 
-        {isRejected ? (
-          <div className="rounded-xl border-2 border-red-500 bg-white shadow-lg p-10 text-center">
-            <ShieldX className="mx-auto mb-4 h-14 w-14 text-red-600" />
-            <p className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-2">
-              Final Underwriting Decision
-            </p>
-            <p className="text-4xl font-extrabold text-red-700">REJECTED</p>
-          </div>
-        ) : (
-          <>
-            {/* Summary Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {[
-                { label: "Monthly Income", value: fmt(form.monthly_income) },
-                { label: "Existing EMI", value: fmt(result.existingEMI) },
-                { label: "New EMI", value: fmt(result.emi) },
-                { label: "Total EMI", value: fmt(result.totalEMI || result.existingEMI + result.emi) },
-                { label: "Monthly Surplus", value: fmt(result.surplus) },
-                { label: "Projected Residual Income", value: fmt(result.projectedResidualIncome), highlight: result.projectedResidualIncome <= 0 ? "red" : "green" },
-                { label: "Interest Rate", value: `${result.finalRate.toFixed(2)}%` },
-                { label: "Credit Score", value: `${result.weightedScore.toFixed(1)}/100` },
-                { label: "LTV Ratio", value: `${result.ltv.toFixed(1)}%` },
-                { label: "DTI Ratio", value: `${(result.dti * 100).toFixed(1)}%` },
-                { label: "Total DTI", value: `${(result.totalDTI * 100).toFixed(1)}%` },
-                { label: "NIM", value: `${result.nimPct.toFixed(2)}%` },
-                { label: "Total Payable", value: fmt(result.totalAmountPaid) },
-                { label: "Total Interest", value: fmt(result.totalInterestPaid) },
-                { label: "Requested Loan", value: fmt(form.loan_amount) },
-                { label: "MAX LOAN PROVIDED", value: fmt(result.maxLoanProvided || result.approvedLoanAmount || form.loan_amount), highlight: result.maxLoanProvided < form.loan_amount ? "amber" : "green" },
-                { label: "Collateral Value", value: fmt(form.collateral_value) },
-              ].map((item) => (
-                <div key={item.label} className={`rounded-xl shadow p-4 ${
-                  item.highlight === "red" ? "bg-red-50 border border-red-200" : 
-                  item.highlight === "green" ? "bg-green-50 border border-green-200" : 
-                  "bg-white"
-                }`}>
-                  <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{item.label}</p>
-                  <p className={`text-lg font-bold ${
-                    item.highlight === "red" ? "text-red-700" : 
-                    item.highlight === "green" ? "text-green-700" : 
-                    "text-foreground"
-                  }`}>{item.value}</p>
-                </div>
-              ))}
+        {/* Summary Grid */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {[
+            { label: "Monthly Income", value: fmt(form.monthly_income) },
+            { label: "Existing EMI", value: fmt(result.existingEMI) },
+            { label: "New EMI", value: fmt(result.emi) },
+            { label: "Total EMI", value: fmt(result.totalEMI || result.existingEMI + result.emi) },
+            { label: "Monthly Surplus", value: fmt(result.surplus) },
+            { label: "Projected Residual Income", value: fmt(result.projectedResidualIncome), highlight: result.projectedResidualIncome <= 0 ? "red" : "green" },
+            { label: "Interest Rate", value: `${result.finalRate.toFixed(2)}%` },
+            { label: "Credit Score", value: `${result.weightedScore.toFixed(1)}/100` },
+            { label: "LTV Ratio", value: `${result.ltv.toFixed(1)}%` },
+            { label: "DTI Ratio", value: `${(result.dti * 100).toFixed(1)}%` },
+            { label: "Total DTI", value: `${(result.totalDTI * 100).toFixed(1)}%` },
+            { label: "NIM", value: `${result.nimPct.toFixed(2)}%` },
+            { label: "Total Payable", value: fmt(result.totalAmountPaid) },
+            { label: "Total Interest", value: fmt(result.totalInterestPaid) },
+            { label: "Requested Loan", value: fmt(form.loan_amount) },
+            { label: "MAX LOAN PROVIDED", value: fmt(result.maxLoanProvided || result.approvedLoanAmount || form.loan_amount), highlight: result.maxLoanProvided < form.loan_amount ? "amber" : "green" },
+            { label: "Collateral Value", value: fmt(form.collateral_value) },
+          ].map((item) => (
+            <div key={item.label} className={`rounded-xl shadow p-4 ${
+              item.highlight === "red" ? "bg-red-50 border border-red-200" : 
+              item.highlight === "green" ? "bg-green-50 border border-green-200" : 
+              "bg-white"
+            }`}>
+              <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{item.label}</p>
+              <p className={`text-lg font-bold ${
+                item.highlight === "red" ? "text-red-700" : 
+                item.highlight === "green" ? "text-green-700" : 
+                "text-foreground"
+              }`}>{item.value}</p>
             </div>
+          ))}
+        </div>
 
-            {/* Applicant Details & Credit Summary side by side */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Applicant Details & Credit Summary side by side */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Applicant Details */}
           <div className="bg-white rounded-xl shadow-lg p-5">
             <h3 className="flex items-center gap-2 font-semibold text-base mb-4">
@@ -222,10 +211,10 @@ export default function UnderwriterSummary() {
               )}
             </div>
           </div>
-            </div>
+        </div>
 
-            {/* Score Breakdown */}
-            <div className="bg-white rounded-xl shadow-lg p-5">
+        {/* Score Breakdown */}
+        <div className="bg-white rounded-xl shadow-lg p-5">
           <h3 className="font-semibold text-base mb-4 flex items-center gap-2">
             <IndianRupee className="w-5 h-5 text-blue-700" /> Score Breakdown &amp; Rate Derivation
           </h3>
@@ -254,74 +243,72 @@ export default function UnderwriterSummary() {
               <p className="font-bold text-green-700">{result.nimPct.toFixed(2)}%</p>
             </div>
           </div>
-            </div>
+        </div>
 
-            {/* Decision Reason Codes & Risk Factors */}
-            {(result.reasonCodes && result.reasonCodes.length > 0) && (
-              <div className="bg-white rounded-xl shadow-lg p-5">
-                <h3 className="font-semibold text-base mb-4 text-amber-700">📋 Decision Reason Codes & Risk Factors</h3>
-                <div className="space-y-3">
-                  {result.reasonCodes.map((r) => {
-                    const bgColor =
-                      r.severity === "CRITICAL" ? "bg-red-50 border-red-200" :
-                      r.severity === "HIGH" ? "bg-orange-50 border-orange-200" :
-                      r.severity === "MEDIUM" ? "bg-amber-50 border-amber-200" :
-                      "bg-blue-50 border-blue-200";
-                    return (
-                      <div key={r.code} className={`flex items-start gap-3 p-3 rounded-lg border ${bgColor}`}>
-                        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${bgColor.replace("50", "100")}`}>
-                          {r.code}
-                        </span>
-                        <div className="flex-1">
-                          <p className="text-sm font-semibold">{r.label}</p>
-                          <p className="text-xs mt-0.5">{r.detail}</p>
-                        </div>
-                        <span className={`text-xs font-semibold shrink-0 px-2 py-1 rounded whitespace-nowrap ${
-                          r.severity === "CRITICAL" || r.severity === "HIGH" ? "bg-red-100 text-red-700" :
-                          r.severity === "MEDIUM" ? "bg-amber-100 text-amber-700" :
-                          "bg-blue-100 text-blue-700"
-                        }`}>
-                          {r.severity}
-                        </span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Amortization preview */}
-            <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-              <div className="px-5 py-4 border-b border-gray-100">
-                <h3 className="font-semibold text-base">Amortization Schedule (First 12 Months)</h3>
-              </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="bg-slate-50 text-xs font-semibold text-muted-foreground uppercase">
-                      <th className="px-4 py-3 text-center">Month</th>
-                      <th className="px-4 py-3 text-right">Payment</th>
-                      <th className="px-4 py-3 text-right">Principal</th>
-                      <th className="px-4 py-3 text-right">Interest</th>
-                      <th className="px-4 py-3 text-right">Balance</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {result.amortization.map((row) => (
-                      <tr key={row.month} className="border-t border-gray-50 hover:bg-slate-50">
-                        <td className="px-4 py-2 text-center font-medium">{row.month}</td>
-                        <td className="px-4 py-2 text-right">{`₹${Math.round(row.payment).toLocaleString("en-IN")}`}</td>
-                        <td className="px-4 py-2 text-right text-green-700">{`₹${Math.round(row.principal).toLocaleString("en-IN")}`}</td>
-                        <td className="px-4 py-2 text-right text-red-600">{`₹${Math.round(row.interest).toLocaleString("en-IN")}`}</td>
-                        <td className="px-4 py-2 text-right font-semibold">{`₹${Math.round(row.balance).toLocaleString("en-IN")}`}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+        {/* Decision Reason Codes & Risk Factors */}
+        {(result.reasonCodes && result.reasonCodes.length > 0) && (
+          <div className="bg-white rounded-xl shadow-lg p-5">
+            <h3 className="font-semibold text-base mb-4 text-amber-700">📋 Decision Reason Codes & Risk Factors</h3>
+            <div className="space-y-3">
+              {result.reasonCodes.map((r) => {
+                const bgColor =
+                  r.severity === "CRITICAL" ? "bg-red-50 border-red-200" :
+                  r.severity === "HIGH" ? "bg-orange-50 border-orange-200" :
+                  r.severity === "MEDIUM" ? "bg-amber-50 border-amber-200" :
+                  "bg-blue-50 border-blue-200";
+                return (
+                  <div key={r.code} className={`flex items-start gap-3 p-3 rounded-lg border ${bgColor}`}>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${bgColor.replace("50", "100")}`}>
+                      {r.code}
+                    </span>
+                    <div className="flex-1">
+                      <p className="text-sm font-semibold">{r.label}</p>
+                      <p className="text-xs mt-0.5">{r.detail}</p>
+                    </div>
+                    <span className={`text-xs font-semibold shrink-0 px-2 py-1 rounded whitespace-nowrap ${
+                      r.severity === "CRITICAL" || r.severity === "HIGH" ? "bg-red-100 text-red-700" :
+                      r.severity === "MEDIUM" ? "bg-amber-100 text-amber-700" :
+                      "bg-blue-100 text-blue-700"
+                    }`}>
+                      {r.severity}
+                    </span>
+                  </div>
+                );
+              })}
             </div>
-          </>
+          </div>
         )}
+
+        {/* Amortization preview */}
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100">
+            <h3 className="font-semibold text-base">Amortization Schedule (First 12 Months)</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-slate-50 text-xs font-semibold text-muted-foreground uppercase">
+                  <th className="px-4 py-3 text-center">Month</th>
+                  <th className="px-4 py-3 text-right">Payment</th>
+                  <th className="px-4 py-3 text-right">Principal</th>
+                  <th className="px-4 py-3 text-right">Interest</th>
+                  <th className="px-4 py-3 text-right">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {result.amortization.map((row) => (
+                  <tr key={row.month} className="border-t border-gray-50 hover:bg-slate-50">
+                    <td className="px-4 py-2 text-center font-medium">{row.month}</td>
+                    <td className="px-4 py-2 text-right">{`₹${Math.round(row.payment).toLocaleString("en-IN")}`}</td>
+                    <td className="px-4 py-2 text-right text-green-700">{`₹${Math.round(row.principal).toLocaleString("en-IN")}`}</td>
+                    <td className="px-4 py-2 text-right text-red-600">{`₹${Math.round(row.interest).toLocaleString("en-IN")}`}</td>
+                    <td className="px-4 py-2 text-right font-semibold">{`₹${Math.round(row.balance).toLocaleString("en-IN")}`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
 
         <p className="text-xs text-center text-muted-foreground pb-6">
           Generated by FederalCreditPro · {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}

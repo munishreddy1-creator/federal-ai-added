@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FileText, ShieldX } from "lucide-react";
+import { FileText } from "lucide-react";
 import { evaluate } from "../lib/loanEngine";
 import LoanInputForm from "../components/loan/LoanInputForm";
 import KPICards from "../components/loan/KPICards";
@@ -41,7 +41,6 @@ export default function LoanCalculator() {
   const navigate = useNavigate();
   const [form, setForm] = useState(DEFAULT_FORM);
   const [result, setResult] = useState(null);
-  const isRejected = result?.decision === "REJECT";
 
   // Restore form data from localStorage on component mount
   useEffect(() => {
@@ -101,43 +100,29 @@ export default function LoanCalculator() {
         {/* Results */}
         {result && (
           <div id="results-section" className="space-y-6">
-            {isRejected ? (
-              <div className="bg-white rounded-xl shadow-lg border-2 border-red-500 p-8 text-center">
-                <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-red-100">
-                  <ShieldX className="h-8 w-8 text-red-600" />
-                </div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-red-600 mb-2">
-                  Final Underwriting Decision
-                </p>
-                <p className="text-4xl font-extrabold text-red-700">REJECTED</p>
-              </div>
-            ) : (
-              <>
-                {/* KPI Cards */}
-                <KPICards result={result} />
+            {/* KPI Cards */}
+            <KPICards result={result} />
 
-                {/* Derived Metrics */}
-                <DerivedMetrics result={result} />
+            {/* Derived Metrics */}
+            <DerivedMetrics result={result} />
 
-                {/* Gate Checks + Score Breakdown */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                  <GateChecks gates={result.gates} decision={result.decision} result={result} />
-                  <ScoreBreakdown scores={result.scores} weightedScore={result.weightedScore} />
-                </div>
+            {/* Gate Checks + Score Breakdown */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <GateChecks gates={result.gates} decision={result.decision} result={result} />
+              <ScoreBreakdown scores={result.scores} weightedScore={result.weightedScore} />
+            </div>
 
-                {/* Risk Panel */}
-                <RiskPanel result={result} requestedLoanAmount={form.loan_amount} />
+            {/* Risk Panel */}
+            <RiskPanel result={result} requestedLoanAmount={form.loan_amount} />
 
-                {/* NIM */}
-                <NIMCard result={result} />
+            {/* NIM */}
+            <NIMCard result={result} />
 
-                {/* Amortization */}
-                <AmortizationTable amortization={result.amortization} />
+            {/* Amortization */}
+            <AmortizationTable amortization={result.amortization} />
 
-                {/* Detailed Metrics Table */}
-                <MetricsTable form={form} result={result} />
-              </>
-            )}
+            {/* Detailed Metrics Table */}
+            <MetricsTable form={form} result={result} />
           </div>
         )}
       </main>
