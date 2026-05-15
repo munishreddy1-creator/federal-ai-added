@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FileText } from "lucide-react";
 import { evaluate } from "../lib/loanEngine";
@@ -41,6 +41,20 @@ export default function LoanCalculator() {
   const navigate = useNavigate();
   const [form, setForm] = useState(DEFAULT_FORM);
   const [result, setResult] = useState(null);
+
+  // Restore form data from localStorage on component mount
+  useEffect(() => {
+    const saved = localStorage.getItem("loanApplication");
+    if (saved) {
+      try {
+        const { form: savedForm, result: savedResult } = JSON.parse(saved);
+        setForm(savedForm);
+        setResult(savedResult);
+      } catch (e) {
+        console.error("Error restoring form data:", e);
+      }
+    }
+  }, []);
 
   const handleCalculate = () => {
     const res = evaluate(form);

@@ -13,6 +13,7 @@ import {
   DEFAULT_COST_OF_FUNDS,
   OCCUPATION_TYPES,
   DECISION_REASON_CODE_TEMPLATES,
+  FIOR_SANCTION_RULES,
   getLTVCap,
   getCostOfFunds,
   applyAgeBasedReduction,
@@ -20,6 +21,7 @@ import {
   hasCreditRisk,
   getReasonCodeTemplate,
   AGE_ADJUSTMENT_RULES,
+  evaluateFIORPolicy,
 } from "./underwritingConfig.js";
 
 // ─── EMI Calculation ──────────────────────────────────────────────────────────
@@ -28,6 +30,31 @@ export function calcEMI(principal, annualRate, months) {
   const r = annualRate / 100 / 12;
   const emi = (principal * r * Math.pow(1 + r, months)) / (Math.pow(1 + r, months) - 1);
   return Math.round(emi);
+}
+
+// ─── Aggregate Existing EMIs ──────────────────────────────────────────────────
+/**
+ * Calculate total existing EMI from existing loans array
+ * Supports both legacy single value and new array format
+ * @param {Array|number} existingLoans - Array of {type, emi} or single EMI number
+ * @returns {number} Total existing EMI
+ */
+export function aggregateExistingEMIs(existingLoans) {
+  if (!existingLoans) return 0;
+  
+  // Legacy support: if it's a number, return it directly
+  if (typeof existingLoans === 'number') {
+    return Math.max(0, existingLoans);
+  }
+  
+  // Array format: sum all EMI values
+  if (Array.isArray(existingLoans)) {
+    return existingLoans.reduce((sum, loan) => {
+      return sum + (loan.emi ? Math.max(0, loan.emi) : 0);
+    }, 0);
+  }
+  
+  return 0;
 }
 
 // ─── Amortization Schedule ────────────────────────────────────────────────────
@@ -486,6 +513,7 @@ export function evaluate(form) {
     // NEW FIELDS
     isFestiveSeason = false,
     existingEMI = 0,
+    existing_loans = null,
     emiDefaultCount = 0,
     overdueEMICount = 0,
     activeOverdueAmount = 0,
@@ -517,10 +545,15 @@ export function evaluate(form) {
   const ltv = collateral_value > 0 ? (loan_amount / collateral_value) * 100 : 100;
   const surplus = monthly_income - monthly_obligations - monthly_spends;
 
+  // ── Aggregate Existing EMIs (NEW: Support both single value and array) ──
+  const aggregatedExistingEMI = existing_loans 
+    ? aggregateExistingEMIs(existing_loans)
+    : aggregateExistingEMIs(existingEMI);
+
   // ── EMI Calculations (NEW) ──
   const newEMI = calcEMI(loan_amount, 0, months); // Start with 0% to get base EMI before rate applied
-  const totalEMI = existingEMI + newEMI;
-  const totalObligations = monthly_obligations + newEMI;
+  const totalEMI = aggregatedExistingEMI + newEMI;
+  const totalObligations = monthly_obligations + aggregatedExistingEMI + newEMI;
   const totalDTI = monthly_income > 0 ? totalObligations / monthly_income : 0;
 
   // ── Residual Income (CURRENT) ──
@@ -571,6 +604,37 @@ export function evaluate(form) {
   // ── Recalculate projected residual income with actual EMI ──
   const projectedResidualIncomeActual = monthly_income - monthly_obligations - monthly_spends - emi;
 
+  // ── FIOR (Fixed Obligation to Income Ratio) Calculation (NEW) ──
+  const fiorRatio = monthly_income > 0 
+    ? (monthly_obligations + aggregatedExistingEMI + emi) / monthly_income
+    : 0;
+  
+  // ── FIOR-Based Sanction Logic (NEW) ──
+  const fiorSanction = evaluateFIORPolicy({
+    fiorRatio,
+    occupationType,
+    requestedLoanAmount: adjustedLoanAmount,
+    emi,
+    finalRate,
+    months,
+  });
+
+  // Determine approved loan amount based on FIOR sanction
+  let approvedLoanAmount = adjustedLoanAmount;
+  let maxLoanProvided = adjustedLoanAmount;
+  let fiorAdjustmentReason = null;
+
+  if (fiorSanction.status === "APPROVED_WITH_REDUCTION") {
+    approvedLoanAmount = fiorSanction.approvedLoanAmount;
+    maxLoanProvided = fiorSanction.approvedLoanAmount;
+    fiorAdjustmentReason = fiorSanction.remarks;
+  } else if (fiorSanction.status === "MANUAL_REVIEW" || fiorSanction.status === "REJECTED") {
+    approvedLoanAmount = 0;
+    maxLoanProvided = 0;
+  } else {
+    maxLoanProvided = adjustedLoanAmount;
+  }
+
   // ── Gates ──
   const derived = {
     dti,
@@ -589,6 +653,7 @@ export function evaluate(form) {
     isFestiveSeason: isFestive,
     isAgeAdjusted,
     ltvOutOfRange: !ltvRangeValidation.isInRange,
+    fiorRatio,
   };
 
   const gates = runGates(form, derived);
@@ -602,23 +667,31 @@ export function evaluate(form) {
     decision = "MANUAL REVIEW";
   }
 
+  // Override decision if FIOR sanction is rejection or manual review
+  if (fiorSanction.status === "REJECTED") {
+    decision = "REJECT";
+  } else if (fiorSanction.status === "MANUAL_REVIEW" && decision !== "REJECT") {
+    decision = "MANUAL REVIEW";
+  }
+
   // ── Reason Codes ──
   const reasonCodes = generateReasonCodes(form, derived, gates, decision);
   const riskReasons = buildRiskReasons(form, derived, gates); // Legacy support
 
-  // ── Totals ──
-  const totalAmountPaid = emi * months;
-  const totalInterestPaid = totalAmountPaid - adjustedLoanAmount;
+  // ── Totals (Use approved loan amount) ──
+  const finalEmi = approvedLoanAmount > 0 ? calcEMI(approvedLoanAmount, finalRate, months) : 0;
+  const totalAmountPaid = finalEmi * months;
+  const totalInterestPaid = totalAmountPaid - approvedLoanAmount;
 
   // ── NIM ──
   const nimPct = finalRate - costOfFunds;
-  const nimAmount = (nimPct / 100 / 12) * adjustedLoanAmount * months;
+  const nimAmount = (nimPct / 100 / 12) * approvedLoanAmount * months;
 
   // ── Max safe loan ──
   const maxSafeLoanAmount = calcMaxSafeLoan(surplus, finalRate, months);
 
   // ── Amortization ──
-  const amortization = buildAmortization(adjustedLoanAmount, finalRate, months, 12);
+  const amortization = buildAmortization(approvedLoanAmount, finalRate, months, 12);
 
   return {
     // applicant info
@@ -643,7 +716,7 @@ export function evaluate(form) {
     projectedResidualIncome: projectedResidualIncomeActual,
 
     // EMI (NEW)
-    existingEMI,
+    existingEMI: aggregatedExistingEMI,
     newEMI,
     totalEMI,
     totalObligations,
@@ -682,6 +755,14 @@ export function evaluate(form) {
     decisionReason: decisionResult.reason,
     reasonCodes,
     riskReasons, // legacy
+
+    // FIOR-based sanction (NEW)
+    fiorRatio,
+    fiorSanction,
+    approvedLoanAmount,
+    maxLoanProvided,
+    fiorAdjustmentReason,
+    finalEmi,
 
     // max safe loan
     maxSafeLoanAmount,

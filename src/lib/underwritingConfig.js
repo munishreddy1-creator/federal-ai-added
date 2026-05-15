@@ -56,12 +56,7 @@ export const DEFAULT_COST_OF_FUNDS = {
   "Gold Loan": 6.0,
 };
 
-// ─── STRESS TEST CONFIGURATION ─────────────────────────────────────────────
-export const STRESS_CONFIG = {
-  rateShock: 2.0, // +2% rate shock
-  multiplier: 1.15, // Alternative: 15% EMI multiplier
-  maxEMIRatioOfSurplus: 0.85, // Stress EMI must be <= 85% of surplus
-};
+
 
 // ─── AGE-BASED LOAN ADJUSTMENTS ───────────────────────────────────────────
 export const AGE_ADJUSTMENT_RULES = {
@@ -72,6 +67,11 @@ export const AGE_ADJUSTMENT_RULES = {
 
 // ─── FESTIVAL DISCOUNT ────────────────────────────────────────────────────
 export const FESTIVAL_DISCOUNT = 0.25; // 0.25% rate reduction
+
+// ─── STRESS TESTING CONFIG ────────────────────────────────────────────────
+export const STRESS_CONFIG = {
+  rateShock: 2.0, // +2% rate shock for stress testing
+};
 
 // ─── SCORING WEIGHTS ──────────────────────────────────────────────────────
 export const SCORE_WEIGHTS = {
@@ -359,15 +359,118 @@ export function getReasonCodeTemplate(codeKey) {
   return DECISION_REASON_CODE_TEMPLATES[codeKey] || null;
 }
 
+// ─── FIOR (Fixed Obligation to Income Ratio) SANCTION RULES ─────────────────
+/**
+ * FIOR-based sanction logic for loan approval/reduction
+ * FIOR = Total Fixed Obligations (existing EMIs + new EMI) / Income
+ */
+export const FIOR_SANCTION_RULES = {
+  SALARIED: {
+    // Salaried employee FIOR thresholds
+    fullApproval: { min: 0.25, max: 0.50 },      // 25-50%: Full approval
+    reductionThreshold: 0.59,                     // 50-59.99%: Reduce loan by 10%
+    manualReviewThreshold: 0.70,                  // 60-69.99%: Manual review required
+    rejectThreshold: 0.70,                        // 70%+: Hard rejection
+    loanReductionFactor: 0.90,                    // 10% reduction factor (0.90)
+  },
+  SELF_EMPLOYED: {
+    // Self-employed FIOR thresholds (stricter)
+    fullApproval: { min: 0.25, max: 0.55 },      // 25-55%: Full approval
+    reductionThreshold: 0.64,                     // 55-64.99%: Reduce loan by 10%
+    manualReviewThreshold: 0.75,                  // 65-74.99%: Manual review required
+    rejectThreshold: 0.75,                        // 75%+: Hard rejection
+    loanReductionFactor: 0.90,                    // 10% reduction factor (0.90)
+  },
+};
+
+/**
+ * Evaluate FIOR policy for loan sanction
+ * @param {object} params - { fiorRatio, occupationType, requestedLoanAmount, emi }
+ * @returns {object} { status, approvedLoanAmount, reductionApplied, remarks }
+ */
+export function evaluateFIORPolicy(params) {
+  const { fiorRatio, occupationType = "SALARIED", requestedLoanAmount = 0, emi = 0, finalRate = 0, months = 60 } = params;
+
+  const rules = FIOR_SANCTION_RULES[occupationType] || FIOR_SANCTION_RULES.SALARIED;
+  const fiorPct = fiorRatio * 100;
+
+  // Check full approval threshold (min to max)
+  if (fiorRatio >= rules.fullApproval.min && fiorRatio <= rules.fullApproval.max) {
+    return {
+      status: "APPROVED",
+      approvedLoanAmount: requestedLoanAmount,
+      reductionApplied: false,
+      remarks: `FIOR ${fiorPct.toFixed(1)}% is within full approval range (${(rules.fullApproval.min * 100).toFixed(0)}-${(rules.fullApproval.max * 100).toFixed(0)}%)`,
+      sanctionCode: "FIOR_FULL_APPROVAL",
+    };
+  }
+
+  // Check reduction threshold (above max to reductionThreshold)
+  if (fiorRatio > rules.fullApproval.max && fiorRatio <= rules.reductionThreshold) {
+    const reducedLoan = Math.round(requestedLoanAmount * rules.loanReductionFactor);
+    // Recalculate EMI with reduced principal
+    const newEMI = finalRate === 0 ? Math.round(reducedLoan / months) : calculateEMI(reducedLoan, finalRate, months);
+    return {
+      status: "APPROVED_WITH_REDUCTION",
+      approvedLoanAmount: reducedLoan,
+      reductionApplied: true,
+      reductionFactor: rules.loanReductionFactor,
+      originalLoan: requestedLoanAmount,
+      reductionAmount: requestedLoanAmount - reducedLoan,
+      newEMI,
+      remarks: `FIOR ${fiorPct.toFixed(1)}% exceeds full approval. Loan reduced to ${(rules.loanReductionFactor * 100).toFixed(0)}% of requested amount.`,
+      sanctionCode: "FIOR_REDUCTION_APPLIED",
+    };
+  }
+
+  // Check manual review threshold (above reductionThreshold to manualReviewThreshold)
+  if (fiorRatio > rules.reductionThreshold && fiorRatio < rules.manualReviewThreshold) {
+    return {
+      status: "MANUAL_REVIEW",
+      approvedLoanAmount: 0,
+      reductionApplied: false,
+      remarks: `FIOR ${fiorPct.toFixed(1)}% requires manual underwriter review (${(rules.reductionThreshold * 100).toFixed(0)}-${(rules.manualReviewThreshold * 100).toFixed(1)}%)`,
+      sanctionCode: "FIOR_MANUAL_REVIEW",
+    };
+  }
+
+  // Rejection threshold (at or above manualReviewThreshold)
+  if (fiorRatio >= rules.manualReviewThreshold) {
+    return {
+      status: "REJECTED",
+      approvedLoanAmount: 0,
+      reductionApplied: false,
+      remarks: `FIOR ${fiorPct.toFixed(1)}% exceeds rejection threshold of ${(rules.rejectThreshold * 100).toFixed(0)}%. Application cannot be processed.`,
+      sanctionCode: "FIOR_REJECTION",
+    };
+  }
+
+  return {
+    status: "APPROVED",
+    approvedLoanAmount: requestedLoanAmount,
+    reductionApplied: false,
+    remarks: "Application approved",
+    sanctionCode: "DEFAULT",
+  };
+}
+
+// Helper function for EMI calculation within evaluateFIORPolicy
+function calculateEMI(principal, annualRate, months) {
+  if (annualRate === 0) return Math.round(principal / months);
+  const r = annualRate / 100 / 12;
+  const emi = (principal * r * Math.pow(1 + r, months)) / (Math.pow(1 + r, months) - 1);
+  return Math.round(emi);
+}
+
 export default {
   RATE_BANDS,
   LTV_CAPS,
   LTV_RANGE_RULES,
   COST_OF_FUNDS_OPTIONS,
   DEFAULT_COST_OF_FUNDS,
-  STRESS_CONFIG,
   AGE_ADJUSTMENT_RULES,
   FESTIVAL_DISCOUNT,
+  STRESS_CONFIG,
   SCORE_WEIGHTS,
   GATE_THRESHOLDS,
   AFFORDABILITY_RULES,
@@ -377,10 +480,12 @@ export default {
   DECISION_REASON_CODE_TEMPLATES,
   OCCUPATION_TYPES,
   OCCUPATION_TYPE_OPTIONS,
+  FIOR_SANCTION_RULES,
   getLTVCap,
   getCostOfFunds,
   applyAgeBasedReduction,
   validateLTVRange,
   hasCreditRisk,
   getReasonCodeTemplate,
+  evaluateFIORPolicy,
 };

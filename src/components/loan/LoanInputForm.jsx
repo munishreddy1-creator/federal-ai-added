@@ -122,7 +122,7 @@ export default function LoanInputForm({ form, setForm, onCalculate }) {
 
         {/* Row 3: Obligations, Defaults, Spends */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <NumField label="Monthly Obligations (₹)" value={form.monthly_obligations} onChange={(v) => update("monthly_obligations", v)} prefix="₹" />
+          <NumField label="FIOR - Monthly Fixed Obligations (₹)" value={form.monthly_obligations} onChange={(v) => update("monthly_obligations", v)} prefix="₹" info="Fixed Obligation to Income Ratio component" />
           <NumField label="Past Defaults" value={form.past_defaults} onChange={(v) => update("past_defaults", v)} />
           <NumField label="Monthly Spends (₹)" value={form.monthly_spends} onChange={(v) => update("monthly_spends", v)} prefix="₹" />
         </div>
