@@ -168,6 +168,92 @@ const testCases = [
       decisionReason: 'AFFORDABILITY_FAILURE',
     },
   },
+  {
+    name: 'Loan Against Property (75% LTV + EMI Aggregation + Max Offer)',
+    form: {
+      product: 'Loan Against Property',
+      tenure_months: 120,
+      cibil_score: 780,
+      monthly_income: 500000,
+      monthly_obligations: 50000,
+      past_defaults: 0,
+      monthly_spends: 75000,
+      savings_balance: 1000000,
+      loan_amount: 10000000,
+      collateral_value: 10000000,
+      existing_loans: [{ emi: 10000 }, { emi: 15000 }, { emi: 5000 }],
+      occupationType: 'SALARIED',
+      customInterestRate: 9.25,
+    },
+    expected: {
+      ltvCap: 75,
+      ltvEligibleLoan: 7500000,
+      existingEMI: 30000,
+      finalRate: 9.25,
+      maxLoanProvided: 7500000,
+    },
+    checks: [
+      {
+        label: 'Total EMI = existing EMI + new EMI',
+        validate: (result) => result.totalEMI === result.existingEMI + result.emi,
+      },
+      {
+        label: 'MAX LOAN PROVIDED = minimum model eligibility cap',
+        validate: (result) =>
+          result.maxLoanProvided === Math.min(
+            result.requestedLoanAmount,
+            result.ltvEligibleLoan,
+            result.affordabilityEligibleLoan,
+            result.underwritingEligibleLoan,
+            result.fiorEligibleLoan
+          ),
+      },
+      {
+        label: 'LAP custom interest rate stays inside 8.15%-10.50%',
+        validate: (result) =>
+          result.interestRateValidation.isValid &&
+          result.finalRate >= 8.15 &&
+          result.finalRate <= 10.5,
+      },
+    ],
+  },
+  {
+    name: 'Loan Against Property (Pledged Value Change Caps Max Offer)',
+    form: {
+      product: 'Loan Against Property',
+      tenure_months: 120,
+      cibil_score: 780,
+      monthly_income: 500000,
+      monthly_obligations: 50000,
+      past_defaults: 0,
+      monthly_spends: 75000,
+      savings_balance: 1000000,
+      loan_amount: 10000000,
+      collateral_value: 8000000,
+      existing_loans: [{ emi: 10000 }, { emi: 15000 }, { emi: 5000 }],
+      occupationType: 'SALARIED',
+      customInterestRate: 12,
+    },
+    expected: {
+      ltvCap: 75,
+      ltvEligibleLoan: 6000000,
+      existingEMI: 30000,
+      finalRate: 10.5,
+      maxLoanProvided: 6000000,
+    },
+    checks: [
+      {
+        label: 'Invalid LAP interest rate is capped to 10.50%',
+        validate: (result) =>
+          result.interestRateValidation.isValid === false &&
+          result.interestRateValidation.appliedRate === 10.5,
+      },
+      {
+        label: 'MAX LOAN PROVIDED does not exceed 75% pledged value',
+        validate: (result) => result.maxLoanProvided <= result.ltvEligibleLoan,
+      },
+    ],
+  },
 ];
 
 // ─── Test Runner ───────────────────────────────────────────────────────────────
@@ -202,6 +288,13 @@ function runTest(testCase) {
       if (!assert(actualValue, expectedValue)) {
         testPassed = false;
         failures.push(`${key}: expected ${expectedValue}, got ${actualValue}`);
+      }
+    }
+
+    for (const check of testCase.checks || []) {
+      if (!check.validate(result)) {
+        testPassed = false;
+        failures.push(check.label);
       }
     }
 
