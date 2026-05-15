@@ -363,6 +363,12 @@ assert(
   `Expected ${fmt(expectedTotalExisting)}, got ${fmt(result3.existingEMI || 0)}`
 );
 
+assert(
+  result3.totalEMI === result3.existingEMI + result3.emi,
+  "Total EMI Adds Existing and New EMI",
+  `Expected ${fmt(result3.existingEMI + result3.emi)}, got ${fmt(result3.totalEMI || 0)}`
+);
+
 // ───────────────────────────────────────────────────────────────────────────
 // TEST 8: DECISION OVERRIDE BY FIOR REJECTION
 // ───────────────────────────────────────────────────────────────────────────

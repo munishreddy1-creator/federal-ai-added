@@ -550,17 +550,16 @@ export function evaluate(form) {
     ? aggregateExistingEMIs(existing_loans)
     : aggregateExistingEMIs(existingEMI);
 
-  // ── EMI Calculations (NEW) ──
-  const newEMI = calcEMI(loan_amount, 0, months); // Start with 0% to get base EMI before rate applied
-  const totalEMI = aggregatedExistingEMI + newEMI;
-  const totalObligations = monthly_obligations + aggregatedExistingEMI + newEMI;
-  const totalDTI = monthly_income > 0 ? totalObligations / monthly_income : 0;
+  // ── EMI Estimate (used only before final rate is available) ──
+  const estimatedNewEMI = calcEMI(loan_amount, 0, months);
+  const estimatedTotalObligations = monthly_obligations + aggregatedExistingEMI + estimatedNewEMI;
+  const estimatedTotalDTI = monthly_income > 0 ? estimatedTotalObligations / monthly_income : 0;
 
   // ── Residual Income (CURRENT) ──
   const currentSurplus = monthly_income - monthly_obligations - monthly_spends;
 
   // ── Residual Income (PROJECTED - after new EMI) ──
-  const projectedResidualIncome = monthly_income - monthly_obligations - monthly_spends - newEMI;
+  const projectedResidualIncome = monthly_income - monthly_obligations - monthly_spends - estimatedNewEMI;
 
   // ── Credit Risk Assessment (NEW) ──
   const creditRisk = {
@@ -582,7 +581,7 @@ export function evaluate(form) {
   // ── Scores ──
   const scores = {
     cibil: scoreCIBIL(cibil_score),
-    dti: scoreDTI(totalDTI),
+    dti: scoreDTI(estimatedTotalDTI),
     ltv: scoreLTV(ltv, ltvCap),
     income: scoreIncome(monthly_income),
     defaults: scoreDefaults(past_defaults),
@@ -599,6 +598,9 @@ export function evaluate(form) {
   // ── EMI with rate applied ──
   const emi = calcEMI(adjustedLoanAmount, finalRate, months);
   const stressEMI = calcEMI(adjustedLoanAmount, stressRate, months);
+  const totalEMI = aggregatedExistingEMI + emi;
+  const totalObligations = monthly_obligations + totalEMI;
+  const totalDTI = monthly_income > 0 ? totalObligations / monthly_income : 0;
   const residualIncome = surplus - emi;
 
   // ── Recalculate projected residual income with actual EMI ──
@@ -717,7 +719,7 @@ export function evaluate(form) {
 
     // EMI (NEW)
     existingEMI: aggregatedExistingEMI,
-    newEMI,
+    newEMI: emi,
     totalEMI,
     totalObligations,
     emi, // new EMI with rate applied
