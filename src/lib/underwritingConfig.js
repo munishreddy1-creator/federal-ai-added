@@ -100,8 +100,8 @@ export const GATE_THRESHOLDS = {
     manual: 650,
   },
   dti: {
-    pass: 0.5,
-    manual: 0.5,
+    pass: 0.6,
+    manual: 0.65,
   },
   spend: {
     pass: 0.5,
