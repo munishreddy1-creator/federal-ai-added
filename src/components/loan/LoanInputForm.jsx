@@ -123,7 +123,7 @@ export default function LoanInputForm({ form, setForm, onCalculate }) {
 
         {/* Row 3: Obligations, Defaults, Spends */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          <NumField label="FIOR - Monthly Fixed Obligations (₹)" value={form.monthly_obligations} onChange={(v) => update("monthly_obligations", v)} prefix="₹" info="Fixed Obligation to Income Ratio component" />
+          <NumField label="FOIR - Existing Monthly Obligations (₹)" value={form.monthly_obligations} onChange={(v) => update("monthly_obligations", v)} prefix="₹" info="Total existing fixed obligations. Use this OR Existing EMI below — do not enter the same amount in both." />
           <NumField label="Past Defaults" value={form.past_defaults} onChange={(v) => update("past_defaults", v)} />
           <NumField label="Monthly Spends (₹)" value={form.monthly_spends} onChange={(v) => update("monthly_spends", v)} prefix="₹" />
         </div>
@@ -175,7 +175,7 @@ export default function LoanInputForm({ form, setForm, onCalculate }) {
                     value={form.existingEMI}
                     onChange={(v) => update("existingEMI", v)}
                     prefix="₹"
-                    info="From other loans"
+                    info="From other loans. Use this OR FOIR above — not both for the same obligations."
                   />
                   <NumField
                     label="EMI Default Count"

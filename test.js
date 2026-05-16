@@ -255,6 +255,38 @@ const testCases = [
     ],
   },
   {
+    name: 'DTI and FIOR do not double-count when FOIR and Existing EMI both filled',
+    form: {
+      product: 'Housing Loan',
+      season: 'Normal',
+      tenure_months: 60,
+      cibil_score: 780,
+      monthly_income: 100000,
+      monthly_obligations: 40000,
+      past_defaults: 0,
+      monthly_spends: 10000,
+      savings_balance: 300000,
+      loan_amount: 500000,
+      collateral_value: 1000000,
+      existingEMI: 40000,
+      occupationType: 'SALARIED',
+    },
+    expected: {},
+    checks: [
+      {
+        label: 'FIOR ratio equals total DTI (same formula)',
+        validate: (result) => Math.abs(result.fiorRatio - result.totalDTI) < 0.0001,
+      },
+      {
+        label: 'Total DTI counts existing EMI once, not FOIR + Existing EMI',
+        validate: (result) => {
+          const expected = (40000 + result.emi) / 100000;
+          return Math.abs(result.totalDTI - expected) < 0.001;
+        },
+      },
+    ],
+  },
+  {
     name: 'DTI Gate Uses Existing EMI + Proposed EMI Against Income',
     form: {
       product: 'Housing Loan',
@@ -272,15 +304,15 @@ const testCases = [
       occupationType: 'SALARIED',
     },
     expected: {
-      dti: 0,
+      dti: 0.4,
       totalDTI: 0.50323,
       decision: 'REJECT',
       decisionReason: 'GATE_REJECTION',
     },
     checks: [
       {
-        label: 'Current DTI alone is below threshold',
-        validate: (result) => result.dti < 0.5,
+        label: 'Current DTI uses existing EMI only (not double-counted with FIOR)',
+        validate: (result) => result.dti === 0.4,
       },
       {
         label: 'Total DTI crosses 50% with existing + proposed EMI',

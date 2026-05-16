@@ -64,6 +64,16 @@ export function aggregateExistingEMIs(existingLoans) {
   return 0;
 }
 
+/**
+ * Resolve existing EMI from explicit existing EMI/loans or FOIR/FIOR (monthly_obligations).
+ * Both form fields capture the same obligation — use one source only, never sum (avoids double-counting).
+ */
+export function resolveExistingEMI(aggregatedExistingEMI, monthlyObligations) {
+  const explicit = Math.max(0, aggregatedExistingEMI || 0);
+  const foir = Math.max(0, monthlyObligations || 0);
+  return explicit > 0 ? explicit : foir;
+}
+
 // ─── Amortization Schedule ────────────────────────────────────────────────────
 export function buildAmortization(principal, annualRate, months, previewMonths = 12) {
   const r = annualRate / 100 / 12;
@@ -618,27 +628,29 @@ export function evaluate(form) {
   const ltvCap = getLTVCap(product, isFestive);
   const costOfFunds = getCostOfFunds(product, customCostOfFunds);
 
-  // ── Derived ratios ──
-  const dti = monthly_income > 0 ? monthly_obligations / monthly_income : 0;
-  const spendToIncome = monthly_income > 0 ? monthly_spends / monthly_income : 0;
-  const ltv = collateral_value > 0 ? (loan_amount / collateral_value) * 100 : 100;
-  const surplus = monthly_income - monthly_obligations - monthly_spends;
-
-  // ── Aggregate Existing EMIs (NEW: Support both single value and array) ──
-  const aggregatedExistingEMI = existing_loans 
+  // ── Aggregate Existing EMIs (support single value, array, or FIOR fallback) ──
+  const aggregatedExistingEMI = existing_loans
     ? aggregateExistingEMIs(existing_loans)
     : aggregateExistingEMIs(existingEMI);
+  const effectiveExistingEMI = resolveExistingEMI(aggregatedExistingEMI, monthly_obligations);
+
+  // ── Derived ratios ──
+  const dti = monthly_income > 0 ? effectiveExistingEMI / monthly_income : 0;
+  const spendToIncome = monthly_income > 0 ? monthly_spends / monthly_income : 0;
+  const ltv = collateral_value > 0 ? (loan_amount / collateral_value) * 100 : 100;
+  const surplus = monthly_income - effectiveExistingEMI - monthly_spends;
 
   // ── EMI Estimate (used only before final rate is available) ──
   const estimatedNewEMI = calcEMI(loan_amount, 0, months);
-  const estimatedTotalObligations = monthly_obligations + aggregatedExistingEMI + estimatedNewEMI;
-  const estimatedTotalDTI = monthly_income > 0 ? estimatedTotalObligations / monthly_income : 0;
+  const estimatedTotalDTI = monthly_income > 0
+    ? (effectiveExistingEMI + estimatedNewEMI) / monthly_income
+    : 0;
 
   // ── Residual Income (CURRENT) ──
-  const currentSurplus = monthly_income - monthly_obligations - monthly_spends;
+  const currentSurplus = monthly_income - effectiveExistingEMI - monthly_spends;
 
   // ── Residual Income (PROJECTED - after new EMI) ──
-  const projectedResidualIncome = monthly_income - monthly_obligations - monthly_spends - estimatedNewEMI;
+  const projectedResidualIncome = monthly_income - effectiveExistingEMI - monthly_spends - estimatedNewEMI;
 
   // ── Credit Risk Assessment (NEW) ──
   const creditRisk = {
@@ -665,7 +677,7 @@ export function evaluate(form) {
     income: scoreIncome(monthly_income),
     defaults: scoreDefaults(past_defaults),
     spend: scoreSpend(spendToIncome),
-    liquidity: scoreLiquidity(savings_balance, monthly_obligations, monthly_spends),
+    liquidity: scoreLiquidity(savings_balance, effectiveExistingEMI, monthly_spends),
   };
   const weightedScore = calcWeightedScore(scores);
 
@@ -679,18 +691,15 @@ export function evaluate(form) {
   // ── EMI with rate applied ──
   const emi = calcEMI(adjustedLoanAmount, finalRate, months);
   const stressEMI = calcEMI(adjustedLoanAmount, stressRate, months);
-  const totalEMI = aggregatedExistingEMI + emi;
-  const totalObligations = monthly_obligations + totalEMI;
+  const totalEMI = effectiveExistingEMI + emi;
+  const totalObligations = totalEMI;
+  // Total DTI and FIOR use the same formula: (existing EMI + new EMI) / income
   const totalDTI = monthly_income > 0 ? totalObligations / monthly_income : 0;
+  const fiorRatio = totalDTI;
   const residualIncome = surplus - emi;
 
   // ── Recalculate projected residual income with actual EMI ──
-  const projectedResidualIncomeActual = monthly_income - monthly_obligations - monthly_spends - emi;
-
-  // ── FIOR (Fixed Obligation to Income Ratio) Calculation (NEW) ──
-  const fiorRatio = monthly_income > 0 
-    ? (monthly_obligations + aggregatedExistingEMI + emi) / monthly_income
-    : 0;
+  const projectedResidualIncomeActual = monthly_income - effectiveExistingEMI - monthly_spends - emi;
   
   // ── FIOR-Based Sanction Logic (NEW) ──
   const fiorSanction = evaluateFIORPolicy({
@@ -797,7 +806,7 @@ export function evaluate(form) {
     projectedResidualIncome: projectedResidualIncomeActual,
 
     // EMI (NEW)
-    existingEMI: aggregatedExistingEMI,
+    existingEMI: effectiveExistingEMI,
     newEMI: emi,
     totalEMI,
     totalObligations,

@@ -270,7 +270,8 @@ const form1 = {
 };
 
 const result1 = evaluate(form1);
-const expectedFior1 = (form1.monthly_obligations + form1.existingEMI + result1.emi) / form1.monthly_income;
+// FOIR and existingEMI are alternate inputs — explicit EMI wins when provided
+const expectedFior1 = (form1.existingEMI + result1.emi) / form1.monthly_income;
 const fiorDiff = Math.abs(result1.fiorRatio - expectedFior1);
 assert(
   fiorDiff < 0.001,
