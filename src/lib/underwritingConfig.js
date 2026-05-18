@@ -71,7 +71,7 @@ export const DEFAULT_COST_OF_FUNDS = {
 export const AGE_ADJUSTMENT_RULES = {
   minAgeForReduction: 45,
   maxAgeForReduction: 60,
-  reductionMultiplier: 0.9, // Reduce by 10%
+  reductionMultiplier: 1.0, // Reduce by 10%
 };
 
 // ─── FESTIVAL DISCOUNT ────────────────────────────────────────────────────
@@ -380,7 +380,7 @@ export const FIOR_SANCTION_RULES = {
     reductionThreshold: 0.59,                     // 50-59.99%: Reduce loan by 10%
     manualReviewThreshold: 0.70,                  // 60-69.99%: Manual review required
     rejectThreshold: 0.70,                        // 70%+: Hard rejection
-    loanReductionFactor: 0.90,                    // 10% reduction factor (0.90)
+    loanReductionFactor: 1.0,                    // 10% reduction factor (1.0)
   },
   SELF_EMPLOYED: {
     // Self-employed FIOR thresholds (stricter)
@@ -388,7 +388,7 @@ export const FIOR_SANCTION_RULES = {
     reductionThreshold: 0.64,                     // 55-64.99%: Reduce loan by 10%
     manualReviewThreshold: 0.75,                  // 65-74.99%: Manual review required
     rejectThreshold: 0.75,                        // 75%+: Hard rejection
-    loanReductionFactor: 0.90,                    // 10% reduction factor (0.90)
+    loanReductionFactor: 1.0,                    // 10% reduction factor (1.0)
   },
 };
 
