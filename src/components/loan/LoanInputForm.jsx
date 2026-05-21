@@ -117,7 +117,7 @@ export default function LoanInputForm({ form, setForm, onCalculate }) {
         {/* Row 2: Tenure, CIBIL, Income */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <NumField label="Tenure (months)" value={form.tenure_months} onChange={(v) => update("tenure_months", v)} suffix="months" />
-          <NumField label="CIBIL Score" value={form.cibil_score} onChange={(v) => update("cibil_score", v)} placeholder="300-900,-1" />
+          <NumField label="CIBIL Score" value={form.cibil_score} onChange={(v) => update("cibil_score", v)} placeholder="300-900" />
           <NumField label="Monthly Income (₹)" value={form.monthly_income} onChange={(v) => update("monthly_income", v)} prefix="₹" />
         </div>
 
