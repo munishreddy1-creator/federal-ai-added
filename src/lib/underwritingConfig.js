@@ -122,7 +122,7 @@ export const GATE_THRESHOLDS = {
     manualRatio: 1.0,
   },
   residual: {
-    passRatio: 0.65,
+    passRatio: 1.0,
     manualRatio: 0.0,
   },
 };
