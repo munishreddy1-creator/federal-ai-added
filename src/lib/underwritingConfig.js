@@ -96,7 +96,7 @@ export const SCORE_WEIGHTS = {
 // ─── GATE THRESHOLDS ──────────────────────────────────────────────────────
 export const GATE_THRESHOLDS = {
   cibil: {
-    pass: 700,
+    pass: 700,-1,
     manual: 650,
   },
   dti: {
