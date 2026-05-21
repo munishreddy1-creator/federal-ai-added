@@ -98,7 +98,6 @@ export function buildAmortization(principal, annualRate, months, previewMonths =
 
 // ─── Score Components ─────────────────────────────────────────────────────────
 function scoreCIBIL(cibil) {
-  if (cibil >= -1)  return 100
   if (cibil >= 800) return 100;
   if (cibil >= 750) return 100;
   if (cibil >= 700) return 90;
