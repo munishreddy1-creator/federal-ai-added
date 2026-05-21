@@ -76,7 +76,7 @@ export default function GateChecks({ gates, decision, result }) {
               : "text-red-700"
           }`}>
             Projected Residual Income: ₹{Math.round(result.projectedResidualIncome).toLocaleString("en-IN")} 
-            {result.projectedResidualIncome >= 0 && (
+            {result.projectedResidualIncome <= 0 && (
               <span className="block mt-1 font-semibold">⚠️ Insufficient income after EMI – Not affordable</span>
             )}
           </p>
