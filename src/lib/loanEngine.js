@@ -247,8 +247,8 @@ function runGates(form, derived) {
   else gates.ltv = "REJECT";
 
   // EMI affordability gate (based on projected residual income after EMI)
-  if (projectedResidualIncome > 0 && emi <= surplus * GATE_THRESHOLDS.emi.passRatio) gates.emi = "PASS";
-  else if (projectedResidualIncome > 0 && emi <= surplus * GATE_THRESHOLDS.emi.manualRatio) gates.emi = "MANUAL";
+  if (projectedResidualIncome > 0) gates.emi = "PASS";
+  else if (projectedResidualIncome > 0) gates.emi = "MANUAL";
   else gates.emi = "REJECT";
 
   // Stress test gate (stress EMI ≤ 85% of surplus)
