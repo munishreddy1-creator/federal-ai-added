@@ -7,25 +7,25 @@
 // ─── RATE BANDS BY PRODUCT ─────────────────────────────────────────────────
 export const RATE_BANDS = {
   "Housing Loan": [
-    { min: 750, max: 900-1, rate: { min: 8.0, max: 9.5 } },
+    { min: 750, max: 900, rate: { min: 8.0, max: 9.5 } },
     { min: 700, max: 749, rate: { min: 8.5, max: 11.5 } },
     { min: 650, max: 699, rate: { min: 10.5, max: 12.0 } },
     { min: 300, max: 649, rate: { min: 12.0, max: 14.0 } },
   ],
   "Loan Against Property": [
-    { min: 750, max: 900,-1, rate: { min: 8.15, max: 10.5 } },
+    { min: 750, max: 900, rate: { min: 8.15, max: 10.5 } },
     { min: 700, max: 749, rate: { min: 8.15, max: 10.5 } },
     { min: 650, max: 699, rate: { min: 8.15, max: 10.5 } },
     { min: 300, max: 649, rate: { min: 8.15, max: 10.5 } },
   ],
   "Auto Loan": [
-    { min: 750, max: 900,-1, rate: { min: 9.0, max: 10.0 } },
+    { min: 750, max: 900, rate: { min: 9.0, max: 10.0 } },
     { min: 700, max: 749, rate: { min: 10.0, max: 11.5 } },
     { min: 650, max: 699, rate: { min: 11.5, max: 13.5 } },
     { min: 300, max: 649, rate: { min: 13.5, max: 16.0 } },
   ],
   "Gold Loan": [
-    { min: 750, max: 900,-1, rate: { min: 7.5, max: 8.5 } },
+    { min: 750, max: 900, rate: { min: 7.5, max: 8.5 } },
     { min: 700, max: 749, rate: { min: 8.5, max: 9.5 } },
     { min: 650, max: 699, rate: { min: 9.5, max: 11.0 } },
     { min: 300, max: 649, rate: { min: 11.0, max: 13.0 } },
@@ -96,7 +96,7 @@ export const SCORE_WEIGHTS = {
 // ─── GATE THRESHOLDS ──────────────────────────────────────────────────────
 export const GATE_THRESHOLDS = {
   cibil: {
-    pass: 700,-1,
+    pass: 700,
     manual: 650,
   },
   dti: {
