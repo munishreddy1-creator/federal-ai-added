@@ -123,7 +123,7 @@ export const GATE_THRESHOLDS = {
   },
   residual: {
     passRatio: 1.0,
-    manualRatio: 0.0,
+    manualRatio: 1.2,
   },
 };
 
@@ -228,13 +228,6 @@ export const DECISION_REASON_CODE_TEMPLATES = {
     impact: "MANUAL_REVIEW",
     label: "Fails Stress Test",
     category: "stress_testing",
-  },
-  RESIDUAL_INCOME_LOW: {
-    code: "RC_RESIDUAL_LOW",
-    severity: "MEDIUM",
-    impact: "MANUAL_REVIEW",
-    label: "Low Residual Income",
-    category: "affordability",
   },
   PAST_DEFAULTS: {
     code: "RC_PAST_DEFAULTS",
