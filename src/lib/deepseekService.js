@@ -3,8 +3,19 @@
  * Calls the Gemini API directly from the browser to support static deployments.
  */
 
-const GEMINI_API_KEY = "AIzaSyCPAfwl7b1bkB4OsXlhfoq3S4B_kdvi1AA";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+
+export function getApiKey() {
+  return localStorage.getItem("geminiApiKey") || import.meta.env.VITE_GEMINI_API_KEY || "";
+}
+
+export function saveApiKey(apiKey) {
+  localStorage.setItem("geminiApiKey", apiKey);
+}
+
+export function clearApiKey() {
+  localStorage.removeItem("geminiApiKey");
+}
 
 function currency(value) {
   return Math.round(value || 0).toLocaleString("en-IN");
@@ -111,16 +122,20 @@ ${formatApplicationForSummarization(form, result)}
 Return only the underwriting note.`;
 }
 
-export async function summarizeLoanApplication(form, result) {
+export async function summarizeLoanApplication(form, result, apiKey) {
   try {
     if (!form || !result) {
       throw new Error("Loan form and evaluation result are required.");
+    }
+    
+    if (!apiKey) {
+      throw new Error("API key is required");
     }
 
     const snapshotData = formatApplicationForSummarization(form, result);
     const prompt = buildSummarizationPrompt(form, result);
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await fetch(`${GEMINI_API_URL}?key=${apiKey}`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
