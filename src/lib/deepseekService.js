@@ -1,172 +1,79 @@
 /**
- * Gemini Summarization Client
- * Calls the Gemini API directly from the browser to support static deployments.
+ * Updated Gemini Summarization Client
+ * Includes Professional Banking Report Formatting & Retry Logic
  */
 
-const GEMINI_API_KEY = "AIzaSyCPAfwl7b1bkB4OsXlhfoq3S4B_kdvi1AA";
-const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+const GEMINI_API_KEY = "AIzaSyBXaf3BGRsmUuyHBTeKtzLW8Z3TwA5RAt8"; // WARNING: Move this to a backend proxy!
+const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent";
 
-function currency(value) {
-  return Math.round(value || 0).toLocaleString("en-IN");
-}
-
-function gateSummary(gates) {
-  return Object.entries(gates)
-    .map(([gate, status]) => `${gate.toUpperCase()}=${status}`)
-    .join(", ");
+// Helper: Exponential Backoff Retry Logic
+async function fetchWithRetry(url, options, retries = 5, backoff = 1000) {
+  const response = await fetch(url, options);
+  
+  // If we hit "High Demand" (429) or "Service Unavailable" (503), wait and retry
+  if (!response.ok && (response.status === 429 || response.status === 503) && retries > 0) {
+    const jitter = Math.random() * 1000;
+    await new Promise(resolve => setTimeout(resolve, backoff + jitter));
+    return fetchWithRetry(url, options, retries - 1, backoff * 2);
+  }
+  return response;
 }
 
 function formatApplicationForSummarization(form, result) {
   return `
-UNDERWRITER CREDIT SUMMARY SOURCE DATA
-======================================
-
-APPLICANT INFORMATION:
-- Name: ${form.applicant_name || "N/A"}
-- Product: ${form.product}
-- Tenure: ${form.tenure_months} months
-- CIBIL Score: ${form.cibil_score}
-- Occupation: ${form.occupationType || "N/A"}
-- Age: ${form.applicantAge ? `${form.applicantAge} years` : "N/A"}
-
-FINANCIAL PROFILE:
-- Monthly Income: INR ${currency(form.monthly_income)}
-- Existing EMI: INR ${currency(result.existingEMI)}
-- Monthly Spends: INR ${currency(form.monthly_spends)}
-- Savings Balance: INR ${currency(form.savings_balance)}
-- Current Monthly Surplus: INR ${currency(result.currentSurplus || result.surplus)}
-- Projected Residual Income After New EMI: INR ${currency(result.projectedResidualIncome)}
-
-CREDIT ASSESSMENT:
-- Weighted Credit Score: ${result.weightedScore.toFixed(1)}/100
-- Past Defaults: ${form.past_defaults}
-- EMI Default Count: ${result.emiDefaultCount || 0}
-- Overdue EMI Count: ${result.overdueEMICount || 0}
-- Active Overdue Amount: INR ${currency(result.activeOverdueAmount)}
-
-LOAN DETAILS:
-- Requested Loan Amount: INR ${currency(result.requestedLoanAmount)}
-- Collateral Value: INR ${currency(form.collateral_value)}
-- LTV Ratio: ${result.ltv.toFixed(2)}%
-- LTV Cap: ${result.ltvCap}%
-- New EMI: INR ${currency(result.emi)}
-- Total EMI: INR ${currency(result.totalEMI)}
-- Total Payable: INR ${currency(result.totalAmountPaid)}
-- Total Interest: INR ${currency(result.totalInterestPaid)}
-
-FINANCIAL RATIOS:
-- DTI Current: ${(result.dti * 100).toFixed(2)}%
-- DTI Total: ${(result.totalDTI * 100).toFixed(2)}%
-- FIOR Ratio: ${(result.fiorRatio * 100).toFixed(2)}%
-- Spend-to-Income Ratio: ${(result.spendToIncome * 100).toFixed(2)}%
-
-GATE RESULTS:
-- Gate Summary: ${gateSummary(result.gates)}
-- CIBIL Gate: ${result.gates.cibil}
-- Spend-to-Income Gate: ${result.gates.spend}
-- DTI Gate: ${result.gates.dti}
-- LTV Gate: ${result.gates.ltv}
-- EMI Affordability Gate: ${result.gates.emi}
-- Stress Test Gate: ${result.gates.stress}
-- Residual Income Gate: ${result.gates.residual}
-
-UNDERWRITING DECISION:
-- Decision: ${result.decision}
-- Decision Reason: ${result.decisionReason || "N/A"}
-- Interest Rate: ${result.finalRate.toFixed(2)}%
-- NIM: ${result.nimPct.toFixed(2)}%
-- LTV Eligible Amount: INR ${currency(result.ltvEligibleLoan)}
-- Affordability Eligible Amount: INR ${currency(result.affordabilityEligibleLoan)}
-- FIOR Eligible Amount: INR ${currency(result.fiorEligibleLoan)}
-- Underwriting Eligible Amount: INR ${currency(result.underwritingEligibleLoan)}
-- MAX LOAN PROVIDED: INR ${currency(result.maxLoanProvided)}
-- Final Approved Loan Amount: INR ${currency(result.approvedLoanAmount)}
-- FIOR Sanction Status: ${result.fiorSanction?.status || "N/A"}
-- FIOR Adjustment Reason: ${result.fiorAdjustmentReason || "None"}
-
-RISK FACTORS:
-${result.reasonCodes?.length
-  ? result.reasonCodes.map((reason) => `- [${reason.severity}] ${reason.label}: ${reason.detail}`).join("\n")
-  : "- No risk factors identified"}
-`;
+--- SOURCE DATA FOR CREDIT APPRAISAL MEMORANDUM ---
+APPLICANT: ${form.applicant_name} | Age: ${form.applicantAge} | Occupation: ${form.occupationType}
+CREDIT PROFILE: CIBIL Score: ${form.cibil_score} | Past Defaults: ${form.past_defaults} | Overdue EMIs: ${result.overdueEMICount} | Active Overdue: INR ${currency(result.activeOverdueAmount)}
+LOAN REQUEST: ${form.product} | Amount: INR ${currency(result.requestedLoanAmount)} | Tenure: ${form.tenure_months} months
+FINANCIALS: Monthly Income: INR ${currency(form.monthly_income)} | Monthly Spends: INR ${currency(form.monthly_spends)} | Existing EMI: INR ${currency(result.existingEMI)}
+CASH FLOW: Surplus: INR ${currency(result.currentSurplus)} | Residual Income: INR ${currency(result.projectedResidualIncome)} | DTI Ratio: ${(result.dti * 100).toFixed(2)}%
+COLLATERAL: Value: INR ${currency(form.collateral_value)} | LTV Ratio: ${result.ltv.toFixed(2)}% (Cap: ${result.ltvCap}%)
+DECISION: ${result.decision} | Reason: ${result.decisionReason} | Final Interest Rate: ${result.finalRate.toFixed(2)}% | Max Approved: INR ${currency(result.maxLoanProvided)}
+--------------------------------------------------`;
 }
 
 function buildSummarizationPrompt(form, result) {
-  return `You are writing the underwriting note for the exact credit summary below.
+  return `You are a Senior Credit Officer. Write a formal "Credit Appraisal Memorandum" (CAM) based on the provided data.
+
+Report Structure:
+1. EXECUTIVE SUMMARY: High-level overview of the decision and core recommendation.
+2. APPLICANT PROFILE & PURPOSE: Profile summary and loan purpose.
+3. FINANCIAL ASSESSMENT & CASH FLOW: Analysis of income, obligations, and debt-servicing capability.
+4. COLLATERAL & LTV ANALYSIS: Valuation check and security coverage assessment.
+5. RISK ASSESSMENT & MITIGATION: Detail any risk factors identified in the source data.
+6. CREDIT RECOMMENDATION: Final decision summary, interest rate, and approved amount.
 
 Rules:
-- Use only the supplied source data. Do not infer missing values, invent policy rules, or contradict the final decision.
-- The first line must be "Decision: <decision> - <decision reason>" using the supplied decision and decision reason.
-- The next line must be "Recommended amount: INR <amount>" using MAX LOAN PROVIDED.
-- Then write these headings exactly: "Applicant and request", "Credit and affordability", "Decision drivers", "Risk and action".
-- Under each heading write 1-3 concise bullet points.
-- Mention the product, requested loan amount, tenure, CIBIL score, monthly income, total EMI, projected residual income, final interest rate, LTV ratio and LTV cap.
-- Summarize gate results. If every gate passes, say all gates pass. If any gate is MANUAL or REJECT, name those gates and statuses.
-- Mention risk factors only when they appear in the source data. If none are present, say no reason-coded risk factors were identified.
-- Keep the note professional and underwriter-facing. Avoid marketing language, markdown emphasis, and generic praise.
+- Professional, analytical, and conservative tone.
+- Weave metrics into narrative paragraphs; do not just provide a list of numbers.
+- Ensure the decision rationale aligns exactly with the provided Source Data.
 
 SOURCE DATA:
-${formatApplicationForSummarization(form, result)}
-
-Return only the underwriting note.`;
+${formatApplicationForSummarization(form, result)}`;
 }
 
 export async function summarizeLoanApplication(form, result) {
   try {
-    if (!form || !result) {
-      throw new Error("Loan form and evaluation result are required.");
-    }
-
-    const snapshotData = formatApplicationForSummarization(form, result);
     const prompt = buildSummarizationPrompt(form, result);
 
-    const response = await fetch(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
+    const response = await fetchWithRetry(`${GEMINI_API_URL}?key=${GEMINI_API_KEY}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
-        generationConfig: {
-          temperature: 0.2,
-          maxOutputTokens: 700,
-        },
+        generationConfig: { temperature: 0.1, maxOutputTokens: 1000 },
       }),
     });
 
-    let data;
-    try {
-      data = await response.json();
-    } catch (e) {
-      throw new Error("Invalid response format from server.");
-    }
-
-    if (!response.ok) {
-      throw new Error(data.error?.message || `Summary request failed: ${response.statusText}`);
-    }
-
-    const summaryText = data.candidates?.[0]?.content?.parts
-      ?.map((part) => part.text || "")
-      .join("")
-      .trim();
-
-    if (!summaryText) {
-      throw new Error("Invalid summary response from Gemini.");
-    }
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error?.message || "API Request Failed");
 
     return {
       success: true,
-      snapshot: snapshotData,
-      summary: summaryText,
+      summary: data.candidates[0].content.parts[0].text,
       timestamp: new Date().toLocaleString("en-IN"),
     };
   } catch (error) {
-    console.error("Summarization error:", error);
-    return {
-      success: false,
-      error: error.message || "Failed to summarize application",
-    };
+    return { success: false, error: error.message };
   }
 }
-
-export const summarizeUnderwriter = summarizeLoanApplication;
