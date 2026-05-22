@@ -19,7 +19,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
-    plugins: [react(), geminiSummaryApi(env.GEMINI_API_KEY)],
+    plugins: [react(), geminiSummaryApi(env.GEMINI_API_KEY || 'AIzaSyCPAfwl7b1bkB4OsXlhfoq3S4B_kdvi1AA')],
     resolve: {
       alias: {
         '@': path.resolve(__dirname, './src'),

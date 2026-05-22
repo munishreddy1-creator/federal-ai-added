@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Printer, User, IndianRupee, ShieldCheck, ShieldX, ShieldAlert, Sparkles, X } from "lucide-react";
-import { summarizeLoanApplication, getApiKey, saveApiKey } from "../lib/deepseekService";
+import { summarizeLoanApplication } from "../lib/deepseekService";
 
 function fmt(n) {
   if (n == null) return "—";
@@ -29,44 +29,6 @@ const gateLabels = {
   residual: "Residual Income Gate",
 };
 
-// API Key Modal
-function ApiKeyModal({ isOpen, onClose, onSave }) {
-  const [key, setKey] = useState("");
-  
-  if (!isOpen) return null;
-
-  return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-[60] p-4">
-      <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 space-y-4">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xl font-bold">OpenRouter API Key</h2>
-          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
-            <X className="w-5 h-5" />
-          </button>
-        </div>
-        <p className="text-sm text-gray-600">
-          To generate AI summaries, you need a free OpenRouter API key.
-        </p>
-        <ol className="list-decimal pl-5 text-sm space-y-1 text-gray-600">
-          <li>Visit <a href="https://openrouter.io" target="_blank" rel="noreferrer" className="text-blue-600 hover:underline">openrouter.io</a> and sign up.</li>
-          <li>Create an API key (no credit card required).</li>
-          <li>Paste the key below.</li>
-        </ol>
-        <input 
-          type="password" 
-          placeholder="sk-or-v1-..." 
-          value={key}
-          onChange={(e) => setKey(e.target.value)}
-          className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-        />
-        <div className="flex gap-2 justify-end">
-          <button onClick={onClose} className="px-4 py-2 border rounded-lg text-sm hover:bg-gray-50">Cancel</button>
-          <button onClick={() => { onSave(key); setKey(""); }} className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Save Key</button>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 // Summary Modal
 function SummaryModal({ isOpen, onClose, summary, loading, error }) {
@@ -147,7 +109,6 @@ export default function UnderwriterSummary() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
-  const [showApiKeyModal, setShowApiKeyModal] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("loanApplication");
@@ -157,17 +118,11 @@ export default function UnderwriterSummary() {
   }, []);
 
   const handleSummarize = async () => {
-    const apiKey = getApiKey();
-    if (!apiKey) {
-      setShowApiKeyModal(true);
-      return;
-    }
-
     setLoading(true);
     setError(null);
     setShowSummaryModal(true);
 
-    const result = await summarizeLoanApplication(data.form, data.result, apiKey);
+    const result = await summarizeLoanApplication(data.form, data.result);
     
     setLoading(false);
     if (result.success) {
@@ -176,12 +131,6 @@ export default function UnderwriterSummary() {
       setError(result.error);
       setSummary(null);
     }
-  };
-
-  const handleSaveApiKey = (key) => {
-    saveApiKey(key);
-    setShowApiKeyModal(false);
-    handleSummarize();
   };
 
   if (!data) {
@@ -202,11 +151,6 @@ export default function UnderwriterSummary() {
   return (
     <div className="min-h-screen bg-[hsl(215,30%,97%)]">
       {/* Modals */}
-      <ApiKeyModal
-        isOpen={showApiKeyModal}
-        onClose={() => setShowApiKeyModal(false)}
-        onSave={handleSaveApiKey}
-      />
       <SummaryModal
         isOpen={showSummaryModal}
         onClose={() => setShowSummaryModal(false)}
