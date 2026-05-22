@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Printer, User, IndianRupee, ShieldCheck, ShieldX, ShieldAlert } from "lucide-react";
+import { ArrowLeft, Printer, User, IndianRupee, ShieldCheck, ShieldX, ShieldAlert, Sparkles, X } from "lucide-react";
+import { summarizeLoanApplication } from "../lib/deepseekService";
 
 function fmt(n) {
   if (n == null) return "—";
@@ -28,9 +29,85 @@ const gateLabels = {
   residual: "Residual Income Gate",
 };
 
+// Summary Modal
+function SummaryModal({ isOpen, onClose, summary, loading, error }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4 max-h-screen overflow-y-auto">
+      <div className="bg-white rounded-xl shadow-2xl max-w-2xl w-full max-h-[80vh] overflow-y-auto p-6 space-y-4">
+        <div className="flex items-center justify-between sticky top-0 bg-white pb-4 border-b">
+          <h2 className="text-xl font-bold flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-blue-600" />
+            AI Summary
+          </h2>
+          <button onClick={onClose} className="p-1 hover:bg-gray-100 rounded">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {loading && (
+          <div className="flex items-center justify-center py-8">
+            <div className="text-center">
+              <div className="inline-block animate-spin mb-3">
+                <Sparkles className="w-8 h-8 text-blue-600" />
+              </div>
+              <p className="text-muted-foreground">Generating AI summary...</p>
+            </div>
+          </div>
+        )}
+
+        {error && (
+          <div className="p-4 bg-red-50 border border-red-200 rounded-lg">
+            <p className="text-red-700 font-semibold mb-1">Error</p>
+            <p className="text-red-600 text-sm">{error}</p>
+          </div>
+        )}
+
+        {summary && !loading && (
+          <div className="space-y-4">
+            {summary.snapshot && (
+              <div className="p-4 bg-slate-50 border border-slate-200 rounded-lg">
+                <p className="text-sm text-slate-900 leading-relaxed whitespace-pre-wrap">{summary.snapshot}</p>
+              </div>
+            )}
+            <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <p className="text-sm text-blue-900 leading-relaxed whitespace-pre-wrap">{summary.summary}</p>
+            </div>
+            <p className="text-xs text-muted-foreground text-right">
+              Generated at: {summary.timestamp}
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(summary.summary);
+                  alert("Summary copied to clipboard!");
+                }}
+                className="flex-1 px-4 py-2 border border-blue-300 text-blue-600 rounded-lg hover:bg-blue-50 transition-colors"
+              >
+                Copy to Clipboard
+              </button>
+              <button
+                onClick={onClose}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function UnderwriterSummary() {
   const navigate = useNavigate();
   const [data, setData] = useState(null);
+  const [summary, setSummary] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+  const [showSummaryModal, setShowSummaryModal] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("loanApplication");
@@ -38,6 +115,22 @@ export default function UnderwriterSummary() {
       try { setData(JSON.parse(saved)); } catch {}
     }
   }, []);
+
+  const handleSummarize = async () => {
+    setLoading(true);
+    setError(null);
+    setShowSummaryModal(true);
+
+    const result = await summarizeLoanApplication(data.form, data.result);
+    
+    setLoading(false);
+    if (result.success) {
+      setSummary(result);
+    } else {
+      setError(result.error);
+      setSummary(null);
+    }
+  };
 
   if (!data) {
     return (
@@ -56,6 +149,15 @@ export default function UnderwriterSummary() {
 
   return (
     <div className="min-h-screen bg-[hsl(215,30%,97%)]">
+      {/* Modals */}
+      <SummaryModal
+        isOpen={showSummaryModal}
+        onClose={() => setShowSummaryModal(false)}
+        summary={summary}
+        loading={loading}
+        error={error}
+      />
+
       {/* Header */}
       <header className="bg-[hsl(224,58%,33%)] text-white shadow-lg print:hidden">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -68,9 +170,19 @@ export default function UnderwriterSummary() {
               <p className="text-xs text-blue-200">FederalCreditPro — Loan Assessment Report</p>
             </div>
           </div>
-          <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 rounded-lg border border-blue-400 text-sm font-medium hover:bg-blue-700 transition-colors">
-            <Printer className="w-4 h-4" /> Print / PDF
-          </button>
+          <div className="flex items-center gap-2">
+            <button 
+              onClick={handleSummarize}
+              disabled={loading}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg border border-purple-400 text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Sparkles className="w-4 h-4" /> 
+              {loading ? "Summarizing..." : "Summarize"}
+            </button>
+            <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 rounded-lg border border-blue-400 text-sm font-medium hover:bg-blue-700 transition-colors">
+              <Printer className="w-4 h-4" /> Print / PDF
+            </button>
+          </div>
         </div>
       </header>
 
