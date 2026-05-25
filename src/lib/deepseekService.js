@@ -3,7 +3,7 @@
  * Calls the Gemini API directly from the browser to support static deployments.
  */
 
-const GEMINI_API_KEY = "AIzaSyBXaf3BGRsmUuyHBTeKtzLW8Z3TwA5RAt8";
+const GEMINI_API_KEY = "AIzaSyAA9o9W0rm4f2xzngBIKcstkcKCcyJTK48";
 const GEMINI_API_URL = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
 
 function currency(value) {
