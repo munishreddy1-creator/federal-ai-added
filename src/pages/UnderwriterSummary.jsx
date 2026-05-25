@@ -5,11 +5,19 @@ import { summarizeLoanApplication } from "../lib/deepseekService";
 
 // Standard Financial Number Formatter
 function fmt(n) {
-  if (n == null) return "—";
+  if (n == null || isNaN(n)) return "—";
   if (n >= 10000000) return `₹${(n / 10000000).toFixed(2)} Cr`;
   if (n >= 100000) return `₹${(n / 100000).toFixed(2)} L`;
   if (n >= 1000) return `₹${Math.round(n).toLocaleString("en-IN")}`;
   return `₹${Math.round(n).toLocaleString("en-IN")}`;
+}
+
+// Word Exporter Blank Placeholder Fallback Generator
+function docValue(val, isCurrency = false) {
+  if (val === null || val === undefined || val === "") {
+    return "[________________]";
+  }
+  return isCurrency ? fmt(val) : val;
 }
 
 // UI Badge Component
@@ -28,7 +36,6 @@ function SummaryModal({ isOpen, onClose, summary, loading, error }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
       <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh] border border-gray-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-        {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-slate-50">
           <div className="flex items-center gap-2">
             <Sparkles className="w-5 h-5 text-purple-600" />
@@ -39,7 +46,6 @@ function SummaryModal({ isOpen, onClose, summary, loading, error }) {
           </button>
         </div>
 
-        {/* Content Box */}
         <div className="p-6 overflow-y-auto flex-1 text-sm leading-relaxed text-slate-700 space-y-4">
           {loading && (
             <div className="flex flex-col items-center justify-center py-12 gap-3">
@@ -65,7 +71,6 @@ function SummaryModal({ isOpen, onClose, summary, loading, error }) {
           )}
         </div>
 
-        {/* Footer */}
         <div className="px-5 py-3.5 border-t border-gray-100 bg-slate-50 flex justify-end">
           <button onClick={onClose} className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium shadow transition-colors">
             Close Panel
@@ -115,15 +120,30 @@ export default function UnderwriterSummary() {
     }
   };
 
-  // NATIVE WORD GENERATOR TRACKS 7 EXTENSIVE STRUCTURAL PAGES
   const downloadNativeDocx = () => {
     if (!data) return;
     const { form, result } = data;
 
+    // Strict value extraction mapping without any synthetic static fallback numbers
+    const dynamicApplicantName = form.applicant_name || "";
+    const dynamicMaxLoan = result.maxLoanProvided;
+    const dynamicRequestedLoan = result.requestedLoanAmount ?? form.loan_amount;
+    const dynamicExistingEMI = result.existingEMI;
+    const dynamicMonthlyIncome = form.monthly_income;
+    const dynamicMonthlySpends = form.monthly_spends;
+    const dynamicSurplus = result.surplus;
+    const dynamicNewEMI = result.emi;
+    const dynamicTotalEMI = result.totalEMI;
+    const dynamicResidual = result.projectedResidualIncome;
+    const dynamicCollateralValue = form.collateral_value;
+    const dynamicCibil = form.cibil_score;
+    const dynamicTenure = form.tenure_months;
+    const dynamicInterestRate = result.finalRate;
+
     const htmlTemplate = `
       <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
       <head>
-        <title>LOAN PROPOSAL</title>
+        <title>LOAN PROPOSAL - ${dynamicApplicantName || "CREDIT ANALYSIS"}</title>
         <style>
           body { font-family: 'Segoe UI', Arial, sans-serif; line-height: 1.6; color: #1e293b; padding: 30px; }
           .page-break { page-break-before: always; }
@@ -152,9 +172,9 @@ export default function UnderwriterSummary() {
         
         <div class="meta-box">
           <table style="border:0; margin:0;">
-            <tr style="border:0;"><td style="border:0; font-weight:bold; width:40%;">Proposal Number:</td><td style="border:0;">LN-2026-${(form.savings_balance || "005847").toString().slice(-6)}</td></tr>
+            <tr style="border:0;"><td style="border:0; font-weight:bold; width:40%;">Applicant Identifier:</td><td style="border:0;">${docValue(dynamicApplicantName)}</td></tr>
             <tr style="border:0;"><td style="border:0; font-weight:bold;">Proposal Date:</td><td style="border:0;">${new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</td></tr>
-            <tr style="border:0;"><td style="border:0; font-weight:bold;">Loan Product:</td><td style="border:0;">${form.product || "Secured Personal Loan"}</td></tr>
+            <tr style="border:0;"><td style="border:0; font-weight:bold;">Loan Product:</td><td style="border:0;">${docValue(form.product)}</td></tr>
             <tr style="border:0;"><td style="border:0; font-weight:bold;">Underwriter:</td><td style="border:0;">Credit Analysis Department</td></tr>
           </table>
         </div>
@@ -167,7 +187,7 @@ export default function UnderwriterSummary() {
         <table>
           <tr>
             <td class="font-bold" style="background-color:#f8fafc; width:50%;">Decision</td>
-            <td class="${result.decision === "APPROVE" || result.decision === "APPROVED" ? "highlight-green" : "highlight-red"}">${result.decision === "APPROVE" ? "APPROVED" : result.decision}</td>
+            <td class="${result.decision === "APPROVE" || result.decision === "APPROVED" ? "highlight-green" : "highlight-red"}">${docValue(result.decision)}</td>
           </tr>
         </table>
 
@@ -176,25 +196,25 @@ export default function UnderwriterSummary() {
             <tr><th style="width:50%;">Metric</th><th>Value</th></tr>
           </thead>
           <tbody>
-            <tr><td>Recommended Loan Amount</td><td class="font-bold">${fmt(result.maxLoanProvided)}</td></tr>
-            <tr><td>Loan Tenure</td><td>${form.tenure_months} months</td></tr>
-            <tr><td>Interest Rate (Sanctioned)</td><td class="font-bold">${result.finalRate?.toFixed(2)}% p.a.</td></tr>
-            <tr><td>Monthly EMI</td><td class="font-bold">${fmt(result.emi)}</td></tr>
-            <tr style="background-color:#f8fafc;"><td class="font-bold">Total Amount Payable</td><td class="font-bold">${fmt(result.totalAmountPaid)}</td></tr>
+            <tr><td>Recommended Loan Amount</td><td class="font-bold">${docValue(dynamicMaxLoan, true)}</td></tr>
+            <tr><td>Loan Tenure</td><td>${docValue(dynamicTenure)} months</td></tr>
+            <tr><td>Interest Rate (Sanctioned)</td><td class="font-bold">${dynamicInterestRate != null ? `${Number(dynamicInterestRate).toFixed(2)}% p.a.` : "[________________]"}</td></tr>
+            <tr><td>Monthly EMI</td><td class="font-bold">${docValue(dynamicNewEMI, true)}</td></tr>
+            <tr style="background-color:#f8fafc;"><td class="font-bold">Total Amount Payable</td><td class="font-bold">${docValue(result.totalAmountPaid, true)}</td></tr>
           </tbody>
         </table>
 
         <div class="sub-section-title">Key Strengths</div>
         <ul>
-          <li>Strong credit profile with consistent payment history (Weighted Score: ${result.weightedScore?.toFixed(1) || "78.5"}/100)</li>
-          <li>Adequate collateral coverage with ${result.ltv?.toFixed(2) || "75.00"}% LTV ratio</li>
+          <li>Strong credit profile with consistent payment history ${result.weightedScore != null ? `(Weighted Score: ${Number(result.weightedScore).toFixed(1)}/100)` : ""}</li>
+          <li>Adequate collateral coverage ${result.ltv != null ? `with ${Number(result.ltv).toFixed(2)}% LTV ratio` : ""}</li>
           <li>Stable income with healthy debt service capacity</li>
           <li>All underwriting gates passed; no manual overrides required</li>
         </ul>
 
         <div class="sub-section-title">Risk Factors</div>
         <ul>
-          <li>${form.past_defaults > 0 ? `Minor: Historical default records noted (${form.past_defaults})` : "Minor: Single historical EMI delay (resolved 18 months ago)"}</li>
+          <li>${form.past_defaults > 0 ? `Historical default records noted (${form.past_defaults})` : "Standard exposure background parameters within tolerance range"}</li>
         </ul>
 
         <div class="page-break"></div>
@@ -205,11 +225,11 @@ export default function UnderwriterSummary() {
             <tr><th style="width:50%;">Parameter</th><th>Amount / Rate</th></tr>
           </thead>
           <tbody>
-            <tr><td>Requested Loan Amount</td><td>${fmt(result.requestedLoanAmount)}</td></tr>
-            <tr><td>Sanctioned Loan Amount</td><td class="font-bold">${fmt(result.maxLoanProvided)}</td></tr>
-            <tr><td>Processing Fees (1.5%)</td><td>${fmt(result.maxLoanProvided * 0.015)}</td></tr>
-            <tr><td>Insurance Premium (optional)</td><td>${fmt(8950)}</td></tr>
-            <tr style="background-color:#f8fafc;"><td class="font-bold">Disbursement Amount (net)</td><td class="font-bold">${fmt(result.maxLoanProvided - (result.maxLoanProvided * 0.015))}</td></tr>
+            <tr><td>Requested Loan Amount</td><td>${docValue(dynamicRequestedLoan, true)}</td></tr>
+            <tr><td>Sanctioned Loan Amount</td><td class="font-bold">${docValue(dynamicMaxLoan, true)}</td></tr>
+            <tr><td>Processing Fees</td><td>${dynamicMaxLoan != null ? fmt(dynamicMaxLoan * 0.015) : "[________________]"}</td></tr>
+            <tr><td>Insurance Premium (optional)</td><td>${docValue(result.insurancePremium, true)}</td></tr>
+            <tr style="background-color:#f8fafc;"><td class="font-bold">Disbursement Amount (net)</td><td class="font-bold">${dynamicMaxLoan != null ? fmt(dynamicMaxLoan - (dynamicMaxLoan * 0.015)) : "[________________]"}</td></tr>
           </tbody>
         </table>
 
@@ -219,11 +239,11 @@ export default function UnderwriterSummary() {
             <tr><th style="width:50%;">Term</th><th>Details</th></tr>
           </thead>
           <tbody>
-            <tr><td>Loan Tenure</td><td>${form.tenure_months} months (${(form.tenure_months / 12).toFixed(0)} years)</td></tr>
-            <tr><td>EMI (Fixed)</td><td class="font-bold">${fmt(result.emi)}</td></tr>
+            <tr><td>Loan Tenure</td><td>${docValue(dynamicTenure)} months</td></tr>
+            <tr><td>EMI (Fixed)</td><td class="font-bold">${docValue(dynamicNewEMI, true)}</td></tr>
             <tr><td>First EMI Due</td><td>${new Date(new Date().setMonth(new Date().getMonth() + 1)).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</td></tr>
             <tr><td>EMI Day</td><td>25th of each month</td></tr>
-            <tr><td>Interest Rate</td><td>${result.finalRate?.toFixed(2)}% p.a. fixed</td></tr>
+            <tr><td>Interest Rate</td><td>${dynamicInterestRate != null ? `${Number(dynamicInterestRate).toFixed(2)}% p.a.` : "[________________]"}</td></tr>
             <tr><td>Repayment Mode</td><td>NACH / ECS auto-debit</td></tr>
           </tbody>
         </table>
@@ -234,10 +254,10 @@ export default function UnderwriterSummary() {
             <tr><th style="width:50%;">Cost Component</th><th>Amount</th></tr>
           </thead>
           <tbody>
-            <tr><td>Total Interest Amount</td><td class="font-bold">${fmt(result.totalInterestPaid)}</td></tr>
-            <tr><td>Processing Fee</td><td>${fmt(result.maxLoanProvided * 0.015)}</td></tr>
-            <tr style="background-color:#f8fafc;"><td class="font-bold">Total Cost to Borrower</td><td class="font-bold">${fmt(result.totalInterestPaid + (result.maxLoanProvided * 0.015))}</td></tr>
-            <tr><td>Effective Interest Rate</td><td>${(result.finalRate + 0.97).toFixed(2)}% p.a.</td></tr>
+            <tr><td>Total Interest Amount</td><td class="font-bold">${docValue(result.totalInterestPaid, true)}</td></tr>
+            <tr><td>Processing Fee</td><td>${dynamicMaxLoan != null ? fmt(dynamicMaxLoan * 0.015) : "[________________]"}</td></tr>
+            <tr style="background-color:#f8fafc;"><td class="font-bold">Total Cost to Borrower</td><td class="font-bold">${(result.totalInterestPaid != null && dynamicMaxLoan != null) ? fmt(result.totalInterestPaid + (dynamicMaxLoan * 0.015)) : "[________________]"}</td></tr>
+            <tr><td>Effective Interest Rate</td><td>${dynamicInterestRate != null ? `${(Number(dynamicInterestRate) + 0.97).toFixed(2)}% p.a.` : "[________________]"}</td></tr>
           </tbody>
         </table>
 
@@ -249,9 +269,8 @@ export default function UnderwriterSummary() {
             <tr><th style="width:50%;">Credit Parameter</th><th>Value</th></tr>
           </thead>
           <tbody>
-            <tr><td>CIBIL Score</td><td class="font-bold">${form.cibil_score || "742"} / 900</td></tr>
-            <tr><td>Credit Rating</td><td class="font-bold" style="color:#166534;">Excellent</td></tr>
-            <tr><td>Weighted Credit Score</td><td>${result.weightedScore?.toFixed(1) || "78.5"} / 100</td></tr>
+            <tr><td>CIBIL Score</td><td class="font-bold">${docValue(dynamicCibil)}</td></tr>
+            <tr><td>Weighted Credit Score</td><td>${result.weightedScore != null ? `${Number(result.weightedScore).toFixed(1)} / 100` : "[________________]"}</td></tr>
             <tr><td>Credit Bureau</td><td>CIBIL Limited</td></tr>
             <tr><td>Assessment Date</td><td>${new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</td></tr>
           </tbody>
@@ -263,19 +282,17 @@ export default function UnderwriterSummary() {
             <tr><th style="width:50%;">History Metric</th><th>Status</th></tr>
           </thead>
           <tbody>
-            <tr><td>Active Credit Accounts</td><td>8</td></tr>
-            <tr><td>Total Credit Exposure</td><td>${fmt(result.maxLoanProvided * 2.28 || 2850000)}</td></tr>
-            <tr><td>Total Paid EMIs</td><td>156</td></tr>
-            <tr><td>Default History</td><td>None (last 24 months)</td></tr>
-            <tr><td>EMI Payment Status</td><td class="font-bold" style="color:#166534;">100% on-time</td></tr>
-            <tr><td>Overdue Amount</td><td>₹ 0</td></tr>
-            <tr><td>Past Defaults (lifetime)</td><td>${form.past_defaults || 0}</td></tr>
-            <tr><td>Enquiries (6 months)</td><td>2</td></tr>
+            <tr><td>Active Credit Accounts</td><td>${docValue(result.activeAccounts)}</td></tr>
+            <tr><td>Total Credit Exposure</td><td>${docValue(result.totalCreditExposure, true)}</td></tr>
+            <tr><td>Total Paid EMIs</td><td>${docValue(result.totalPaidEmis)}</td></tr>
+            <tr><td>Default History</td><td>${docValue(result.defaultHistory)}</td></tr>
+            <tr><td>Overdue Amount</td><td>${docValue(result.overdueAmount, true)}</td></tr>
+            <tr><td>Past Defaults (lifetime)</td><td>${docValue(form.past_defaults)}</td></tr>
           </tbody>
         </table>
 
         <div class="sub-section-title">Assessment & Conclusion</div>
-        <p>Credit analysis reveals a borrower with strong payment discipline and excellent credit management. CIBIL score of 742 is well above the acceptable threshold of 650. No defaults or delays noted in the past 24 months. The applicant demonstrates consistent ability to service multiple credit obligations, indicating strong creditworthiness.</p>
+        <p>Credit analysis parameters extracted directly from metrics state evaluation. CIBIL check threshold assessment complete. The underlying records trace credit obligations and behavioral metrics configured within the framework engine profile data bounds.</p>
 
         <div class="page-break"></div>
         <div class="section-title">4. FINANCIAL ASSESSMENT & AFFORDABILITY</div>
@@ -285,11 +302,10 @@ export default function UnderwriterSummary() {
             <tr><th style="width:50%;">Income Parameter</th><th>Amount</th></tr>
           </thead>
           <tbody>
-            <tr><td>Monthly Gross Income</td><td class="font-bold">${fmt(form.monthly_income)}</td></tr>
-            <tr><td>Annual Income</td><td class="font-bold">${fmt(form.monthly_income * 12)}</td></tr>
+            <tr><td>Monthly Gross Income</td><td class="font-bold">${docValue(dynamicMonthlyIncome, true)}</td></tr>
+            <tr><td>Annual Income</td><td class="font-bold">${dynamicMonthlyIncome != null ? fmt(dynamicMonthlyIncome * 12) : "[________________]"}</td></tr>
             <tr><td>Income Verification</td><td>Salary slip + ITR</td></tr>
-            <tr><td>Years at Current Employment</td><td>8 years</td></tr>
-            <tr><td>Income Stability Rating</td><td class="font-bold" style="color:#166534;">Stable</td></tr>
+            <tr><td>Years at Current Employment</td><td>${docValue(form.years_employment)}</td></tr>
           </tbody>
         </table>
 
@@ -299,14 +315,13 @@ export default function UnderwriterSummary() {
             <tr><th style="width:50%;">DSA Metric</th><th>Value</th></tr>
           </thead>
           <tbody>
-            <tr><td>Monthly Gross Income</td><td>${fmt(form.monthly_income)}</td></tr>
-            <tr><td>Existing EMI Obligations</td><td>${fmt(result.existingEMI || 32500)}</td></tr>
-            <tr><td>Monthly Spends (avg)</td><td>${fmt(form.monthly_spends)}</td></tr>
-            <tr><td>Current Monthly Surplus</td><td>${fmt(result.surplus)}</td></tr>
-            <tr><td>New EMI (proposed)</td><td class="font-bold">${fmt(result.emi)}</td></tr>
-            <tr><td>Total EMI (all obligations)</td><td class="font-bold">${fmt(result.totalEMI || result.existingEMI + result.emi)}</td></tr>
-            <tr><td>Residual Income (post-EMI)</td><td class="font-bold text-green-700">${fmt(result.projectedResidualIncome)}</td></tr>
-            <tr><td>Residual Income Sufficiency</td><td class="font-bold" style="color:#166534;">Above 50% threshold</td></tr>
+            <tr><td>Monthly Gross Income</td><td>${docValue(dynamicMonthlyIncome, true)}</td></tr>
+            <tr><td>Existing EMI Obligations</td><td class="font-bold">${docValue(dynamicExistingEMI, true)}</td></tr>
+            <tr><td>Monthly Spends (avg)</td><td>${docValue(dynamicMonthlySpends, true)}</td></tr>
+            <tr><td>Current Monthly Surplus</td><td>${docValue(dynamicSurplus, true)}</td></tr>
+            <tr><td>New EMI (proposed)</td><td class="font-bold">${docValue(dynamicNewEMI, true)}</td></tr>
+            <tr><td>Total EMI (all obligations)</td><td class="font-bold">${docValue(dynamicTotalEMI, true)}</td></tr>
+            <tr><td>Residual Income (post-EMI)</td><td class="font-bold">${docValue(dynamicResidual, true)}</td></tr>
           </tbody>
         </table>
 
@@ -316,17 +331,14 @@ export default function UnderwriterSummary() {
             <tr><th style="width:50%;">Financial Ratio</th><th>Value / Status</th></tr>
           </thead>
           <tbody>
-            <tr><td>Debt-to-Income (Current)</td><td>26.0%</td></tr>
-            <tr><td>Debt-to-Income (Post-Loan)</td><td class="font-bold">47.2%</td></tr>
+            <tr><td>Debt-to-Income (Current)</td><td>${(dynamicExistingEMI != null && dynamicMonthlyIncome) ? `${((dynamicExistingEMI / dynamicMonthlyIncome) * 100).toFixed(1)}%` : "[________________]"}</td></tr>
+            <tr><td>Debt-to-Income (Post-Loan)</td><td class="font-bold">${(dynamicTotalEMI != null && dynamicMonthlyIncome) ? `${((dynamicTotalEMI / dynamicMonthlyIncome) * 100).toFixed(1)}%` : "[________________]"}</td></tr>
             <tr><td>DTI Acceptance Limit</td><td>60%</td></tr>
-            <tr><td>DTI Status</td><td class="font-bold" style="color:#166534;">PASS</td></tr>
-            <tr><td>Spend-to-Income Ratio</td><td>23.0%</td></tr>
-            <tr><td>Savings Rate</td><td>51.0%</td></tr>
-            <tr><td>FIOR Ratio</td><td>11.2%</td></tr>
-            <tr style="background-color:#f8fafc;"><td class="font-bold">Affordability Assessment</td><td class="font-bold" style="color:#166534;">STRONG</td></tr>
+            <tr><td>Spend-to-Income Ratio</td><td>${(dynamicMonthlySpends != null && dynamicMonthlyIncome) ? `${((dynamicMonthlySpends / dynamicMonthlyIncome) * 100).toFixed(1)}%` : "[________________]"}</td></tr>
+            <tr><td>Savings Rate</td><td>${(dynamicSurplus != null && dynamicMonthlyIncome) ? `${((dynamicSurplus / dynamicMonthlyIncome) * 100).toFixed(1)}%` : "[________________]"}</td></tr>
+            <tr><td>FIOR Ratio</td><td>${result.fiorRatio != null ? `${Number(result.fiorRatio).toFixed(1)}%` : "[________________]"}</td></tr>
           </tbody>
         </table>
-        <p>The applicant demonstrates strong financial stability with stable employment, healthy income levels, and adequate surplus for debt servicing. Post-loan DTI of 47.2% indicates comfortable debt capacity with room for additional obligations. Residual income analysis confirms strong affordability for the proposed EMI.</p>
 
         <div class="page-break"></div>
         <div class="section-title">5. COLLATERAL VALUATION & LTV ANALYSIS</div>
@@ -337,10 +349,7 @@ export default function UnderwriterSummary() {
           </thead>
           <tbody>
             <tr><td>Collateral Type</td><td>Fixed Deposit (FD)</td></tr>
-            <tr><td>FD Issuing Bank</td><td>Scheduled Bank</td></tr>
-            <tr><td>FD Amount (Face Value)</td><td class="font-bold">${fmt(form.collateral_value || 1667000)}</td></tr>
-            <tr><td>FD Tenure</td><td>60 months maturity</td></tr>
-            <tr><td>FD Interest Rate</td><td>6.50% p.a.</td></tr>
+            <tr><td>FD Amount (Face Value)</td><td class="font-bold">${docValue(dynamicCollateralValue, true)}</td></tr>
             <tr><td>Pledge Status</td><td class="font-bold">First charge</td></tr>
           </tbody>
         </table>
@@ -351,18 +360,13 @@ export default function UnderwriterSummary() {
             <tr><th style="width:50%;">LTV Component</th><th>Amount</th></tr>
           </thead>
           <tbody>
-            <tr><td>Collateral Current Value</td><td>${fmt(form.collateral_value || 1667000)}</td></tr>
-            <tr><td>Sanctioned Loan Amount</td><td class="font-bold">${fmt(result.maxLoanProvided)}</td></tr>
-            <tr><td>LTV Ratio</td><td class="font-bold">${result.ltv?.toFixed(2) || "75.00"}%</td></tr>
+            <tr><td>Collateral Current Value</td><td>${docValue(dynamicCollateralValue, true)}</td></tr>
+            <tr><td>Sanctioned Loan Amount</td><td class="font-bold">${docValue(dynamicMaxLoan, true)}</td></tr>
+            <tr><td>LTV Ratio</td><td class="font-bold">${result.ltv != null ? `${Number(result.ltv).toFixed(2)}%` : "[________________]"}</td></tr>
             <tr><td>Acceptable LTV Ceiling</td><td>85%</td></tr>
-            <tr><td>LTV Status</td><td class="font-bold" style="color:#166534;">PASS</td></tr>
-            <tr><td>Excess Collateral Buffer</td><td>10.00%</td></tr>
-            <tr style="background-color:#f8fafc;"><td class="font-bold">Security Coverage</td><td class="font-bold" style="color:#166534;">133%</td></tr>
+            <tr><td>Security Coverage</td><td class="font-bold">${(dynamicCollateralValue && dynamicMaxLoan) ? `${(((dynamicCollateralValue) / dynamicMaxLoan) * 100).toFixed(0)}%` : "[________________]"}</td></tr>
           </tbody>
         </table>
-
-        <div class="sub-section-title">Valuation Methodology</div>
-        <p>FD valuation: Face value as per certificate of deposit. Collateral marked as first charge; lien registered with FD issuing bank. Liquid collateral with zero realization risk and guaranteed maturity value. LTV of 75% provides adequate security buffer against loan principal.</p>
 
         <div class="page-break"></div>
         <div class="section-title">6. UNDERWRITING GATES & FINAL DECISION</div>
@@ -375,7 +379,7 @@ export default function UnderwriterSummary() {
             ${Object.entries(result.gates || {}).map(([key, status]) => `
               <tr>
                 <td>${gateLabels[key] || key}</td>
-                <td class="font-bold" style="color:#166534;">✓ ${status}</td>
+                <td class="font-bold">✓ ${docValue(status)}</td>
               </tr>
             `).join("")}
           </tbody>
@@ -383,27 +387,21 @@ export default function UnderwriterSummary() {
 
         <div class="sub-section-title">Approval Conditions & Mandatory Requirements</div>
         <ul>
-          <li>First charge lien on FD (${fmt(form.collateral_value || 1667000)}) to be registered with FD issuing bank before disbursement</li>
-          <li>Mandatory insurance cover on EMI amount (optional loan insurance product at discounted rate)</li>
-          <li>All advances to be funded through auto-debit from applicant's salary account only</li>
-          <li>Quarterly monitoring of CIBIL score; material adverse change (score drop >50 points) triggers review</li>
-          <li>Annual income certification / ITR submission for continuance of credit line</li>
-          <li>In case of default: 3-day cure period before late fee (₹ 500) and interest acceleration triggered</li>
+          <li>First charge lien registration execution based on standard credit procedure rules.</li>
+          <li>Disbursement contingent upon full checklist clearance matching evaluated metrics framework parameters.</li>
         </ul>
 
         <div class="sub-section-title">Final Underwriting Recommendation</div>
-        <p class="font-bold" style="font-size:13px; color:#166534; text-align:center; background-color:#f0fdf4; padding:8px; border:1px solid #bbf7d0; border-radius:4px;">
-          RECOMMENDED FOR APPROVAL
+        <p class="font-bold" style="font-size:13px; text-align:center; background-color:#f0fdf4; padding:8px; border:1px solid #bbf7d0; border-radius:4px;">
+          DECISION STATUS: ${docValue(result.decision)}
         </p>
-        <p>The applicant meets all underwriting criteria with no exceptions or manual overrides required. Strong credit profile, adequate income, healthy affordability ratios, and collateral coverage of 133% provide adequate security. All gates are passed. The loan application is recommended for immediate approval and disbursement.</p>
 
         <br/>
         <table style="border:0; margin-top:20px;">
           <tr style="border:0;">
             <td style="border:0; width:50%; font-size:11px; color:#64748b;">
               <strong>Underwriting Officer</strong><br/>
-              Credit Analysis Department<br/>
-              FederalCreditPro Engine Terminal
+              Credit Analysis Department
             </td>
             <td style="border:0; width:50%; text-align:right; font-size:11px; color:#64748b; vertical-align:bottom;">
               <strong>Date:</strong> ${new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
@@ -413,7 +411,7 @@ export default function UnderwriterSummary() {
 
         <br/><br/>
         <div style="font-size:10px; text-align:center; color:#94a3b8; margin-top:35px; font-weight:bold;">
-          *** END OF PROPOSAL — CONFIDENTIAL PROPERTY OF FEDERALCREDITPRO ***
+          *** END OF PROPOSAL — CONFIDENTIAL UNDERWRITING RECORD ***
         </div>
       </body>
       </html>
@@ -423,7 +421,7 @@ export default function UnderwriterSummary() {
     const url = URL.createObjectURL(blob);
     const downloadLink = document.createElement("a");
     downloadLink.href = url;
-    downloadLink.download = `Loan_Proposal_${form.applicant_name || "Assessment"}.doc`;
+    downloadLink.download = `Loan_Proposal_${dynamicApplicantName || "Underwriting_Record"}.doc`;
     document.body.appendChild(downloadLink);
     downloadLink.click();
     document.body.removeChild(downloadLink);
@@ -475,33 +473,31 @@ export default function UnderwriterSummary() {
       </header>
 
       <main className="max-w-5xl mx-auto px-4 py-6 space-y-6 print:p-0">
-        {/* Main Status Header */}
         <div className={`rounded-xl border-2 ${decisionBorder} bg-white shadow-lg p-6 flex items-center justify-between`}>
           <div>
             <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Final Underwriting Decision</p>
             <p className="text-3xl font-extrabold text-slate-900">{form.applicant_name || "Applicant"}</p>
-            <p className="text-sm text-muted-foreground mt-1">{form.product || "Secured Personal Loan"} · {form.tenure_months} Months · {fmt(form.loan_amount)}</p>
+            <p className="text-sm text-muted-foreground mt-1">{form.product || "Secured Personal Loan"} · {form.tenure_months ?? "—"} Months · {fmt(form.loan_amount)}</p>
           </div>
           <span className={`${decisionColor} text-white text-xl font-extrabold px-8 py-3 rounded-xl`}>
-            {result.decision === "APPROVE" || result.decision === "APPROVED" ? "APPROVED" : result.decision}
+            {result.decision === "APPROVE" || result.decision === "APPROVED" ? "APPROVED" : result.decision || "—"}
           </span>
         </div>
 
-        {/* Core Metrics Overview Grid */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {[
-            { label: "Requested Amount", value: fmt(result.requestedLoanAmount) },
-            { label: "MAX LOAN PROVIDED", value: fmt(result.maxLoanProvided), highlight: result.maxLoanProvided < result.requestedLoanAmount ? "amber" : "green" },
-            { label: "Monthly New EMI", value: fmt(result.emi) },
-            { label: "Total Combined EMI", value: fmt(result.totalEMI || result.existingEMI + result.emi) },
-            { label: "Sanctioned Rate", value: `${result.finalRate?.toFixed(2)}% p.a.` },
-            { label: "Loan-To-Value (LTV)", value: `${result.ltv?.toFixed(2)}%` },
-            { label: "Total Interest Outflow", value: fmt(result.totalInterestPaid) },
-            { label: "Total Payable Outflow", value: fmt(result.totalAmountPaid) },
-            { label: "LTV Eligible Amount", value: fmt(result.ltvEligibleLoan) },
-            { label: "Affordability Eligible", value: fmt(result.affordabilityEligibleLoan) },
-            { label: "FIOR Eligible Amount", value: fmt(result.fiorEligibleLoan) },
-            { label: "Projected Residual Income", value: fmt(result.projectedResidualIncome), highlight: result.projectedResidualIncome <= 0 ? "red" : "green" },
+            { label: "Requested Amount", value: fmt(result.requestedLoanAmount ?? form.loan_amount) },
+            { label: "MAX LOAN PROVIDED", value: fmt(result.maxLoanProvided ?? 0), highlight: (result.maxLoanProvided ?? 0) < (result.requestedLoanAmount ?? form.loan_amount ?? 0) ? "amber" : "green" },
+            { label: "Monthly New EMI", value: fmt(result.emi ?? 0) },
+            { label: "Total Combined EMI", value: fmt(result.totalEMI ?? ((result.existingEMI ?? 0) + (result.emi ?? 0))) },
+            { label: "Sanctioned Rate", value: result.finalRate != null ? `${Number(result.finalRate).toFixed(2)}% p.a.` : "—" },
+            { label: "Loan-To-Value (LTV)", value: result.ltv != null ? `${Number(result.ltv).toFixed(2)}%` : "—" },
+            { label: "Total Interest Outflow", value: fmt(result.totalInterestPaid ?? 0) },
+            { label: "Total Payable Outflow", value: fmt(result.totalAmountPaid ?? 0) },
+            { label: "LTV Eligible Amount", value: fmt(result.ltvEligibleLoan ?? 0) },
+            { label: "Affordability Eligible", value: fmt(result.affordabilityEligibleLoan ?? 0) },
+            { label: "FIOR Eligible Amount", value: fmt(result.fiorEligibleLoan ?? 0) },
+            { label: "Projected Residual Income", value: fmt(result.projectedResidualIncome ?? 0), highlight: (result.projectedResidualIncome ?? 0) <= 0 ? "red" : "green" },
           ].map((item) => (
             <div key={item.label} className={`rounded-xl shadow p-4 border ${
               item.highlight === "red" ? "bg-red-50 border-red-200 text-red-700" : 
@@ -516,22 +512,21 @@ export default function UnderwriterSummary() {
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Complete Data Parameter List */}
           <div className="bg-white rounded-xl shadow p-5 border border-gray-100">
             <h3 className="flex items-center gap-2 font-bold text-slate-900 text-base mb-4"><User className="w-5 h-5 text-blue-700" /> Full Particulars File</h3>
             <div className="space-y-2 text-sm">
               {[
                 ["Applicant Name Reference", form.applicant_name || "—"],
-                ["Requested Funding Target", fmt(result.requestedLoanAmount)],
-                ["Sanctioned Dynamic Ceiling", fmt(result.maxLoanProvided)],
-                ["Gross Monthly Income", fmt(form.monthly_income)],
-                ["Average Living Expenditures", fmt(form.monthly_spends)],
-                ["Pre-Existing Liabilities (EMI)", fmt(result.existingEMI || 0)],
+                ["Requested Funding Target", fmt(result.requestedLoanAmount ?? form.loan_amount)],
+                ["Sanctioned Dynamic Ceiling", fmt(result.maxLoanProvided ?? 0)],
+                ["Gross Monthly Income", fmt(form.monthly_income ?? 0)],
+                ["Average Living Expenditures", fmt(form.monthly_spends ?? 0)],
+                ["Pre-Existing Liabilities (EMI)", fmt(result.existingEMI ?? 0)],
                 ["CIBIL Bureau Score", form.cibil_score || "—"],
-                ["Pledged Asset Value", fmt(form.collateral_value)],
-                ["LTV Cap Approved Ceiling", fmt(result.ltvEligibleLoan)],
-                ["Affordability Formula Ceiling", fmt(result.affordabilityEligibleLoan)],
-                ["FIOR Policy Frame Ceiling", fmt(result.fiorEligibleLoan)],
+                ["Pledged Asset Value", fmt(form.collateral_value ?? 0)],
+                ["LTV Cap Approved Ceiling", fmt(result.ltvEligibleLoan ?? 0)],
+                ["Affordability Formula Ceiling", fmt(result.affordabilityEligibleLoan ?? 0)],
+                ["FIOR Policy Frame Ceiling", fmt(result.fiorEligibleLoan ?? 0)],
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between py-1.5 border-b border-gray-100 last:border-0">
                   <span className="text-muted-foreground font-medium">{k}</span>
@@ -541,7 +536,6 @@ export default function UnderwriterSummary() {
             </div>
           </div>
 
-          {/* Compliance Policy Checks */}
           <div className="bg-white rounded-xl shadow p-5 border border-gray-100">
             <h3 className="flex items-center gap-2 font-bold text-slate-900 text-base mb-4"><ShieldCheck className="w-5 h-5 text-blue-700" /> Underwriting Core Compliance Gates</h3>
             <div className="space-y-2">
@@ -555,7 +549,6 @@ export default function UnderwriterSummary() {
           </div>
         </div>
 
-        {/* Score Breakdown Section */}
         {result.scores && (
           <div className="bg-white rounded-xl shadow p-5 border border-gray-100">
             <h3 className="font-bold text-slate-900 text-base mb-4 flex items-center gap-2">
@@ -572,7 +565,6 @@ export default function UnderwriterSummary() {
           </div>
         )}
 
-        {/* Amortization Table */}
         {result.amortization && (
           <div className="bg-white rounded-xl shadow border border-gray-100 overflow-hidden">
             <div className="px-5 py-4 border-b border-gray-100">
