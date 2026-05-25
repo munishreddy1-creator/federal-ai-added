@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Printer, User, IndianRupee, ShieldCheck, ShieldX, ShieldAlert, Sparkles, X } from "lucide-react";
+import { ArrowLeft, Printer, User, IndianRupee, ShieldCheck, ShieldX, ShieldAlert, Sparkles, X, FileText } from "lucide-react";
 import { summarizeLoanApplication } from "../lib/deepseekService";
 
 // Standard Financial Number Formatter
@@ -31,7 +31,6 @@ const gateLabels = {
   residual: "Residual Income Gate",
 };
 
-// Print Layout Dictionary Mapping
 const gateLabelsMap = {
   cibil: "CIBIL Gate (Score ≥ 650)",
   spend: "Spend-to-Income Gate",
@@ -43,7 +42,7 @@ const gateLabelsMap = {
 };
 
 // ============================================================================
-// COMPONENT 1: LOAN PROPOSAL PRINT LAYOUT (IN-FILE TO PREVENT BUNDLING ERRORS)
+// COMPONENT 1: LOAN PROPOSAL PRINT LAYOUT
 // ============================================================================
 function LoanProposalPrintLayout({ form, result }) {
   if (!form || !result) return null;
@@ -53,15 +52,12 @@ function LoanProposalPrintLayout({ form, result }) {
 
   return (
     <div className="hidden print:block p-12 bg-white text-black font-sans text-[11px] leading-relaxed max-w-[800px] mx-auto">
-      
-      {/* HEADER SECTION */}
       <div className="text-center mb-6">
         <h1 className="text-2xl font-extrabold text-slate-900 tracking-wide uppercase">LOAN PROPOSAL</h1>
         <p className="text-xs font-medium text-slate-700 mt-0.5">Bank Credit Assessment & Underwriting Report</p>
         <p className="text-[9px] text-slate-400 tracking-widest mt-1.5 uppercase font-semibold">CONFIDENTIAL - FOR AUTHORIZED USE ONLY</p>
       </div>
 
-      {/* METADATA SUMMARY TABLE */}
       <table className="w-full border border-slate-300 mb-6">
         <tbody>
           <tr className="border-b border-slate-300">
@@ -79,7 +75,6 @@ function LoanProposalPrintLayout({ form, result }) {
         </tbody>
       </table>
 
-      {/* 1. EXECUTIVE SUMMARY */}
       <div className="mb-6">
         <h2 className="text-xs font-bold text-slate-950 bg-slate-100 p-1 mb-2 uppercase tracking-wider border-l-2 border-slate-900 pl-2">1. Executive Summary</h2>
         <p className="mb-3 text-slate-800">
@@ -131,7 +126,6 @@ function LoanProposalPrintLayout({ form, result }) {
         </table>
       </div>
 
-      {/* 2. LOAN DETAILS & REPAYMENT EXPOSURE */}
       <div className="mb-6">
         <h2 className="text-xs font-bold text-slate-950 bg-slate-100 p-1 mb-2 uppercase tracking-wider border-l-2 border-slate-900 pl-2">2. Loan Structure & Pricing Spread</h2>
         <div className="grid grid-cols-2 gap-4">
@@ -148,7 +142,7 @@ function LoanProposalPrintLayout({ form, result }) {
                 </tr>
                 <tr className="font-bold border-t border-slate-400">
                   <td className="p-2 bg-slate-100">Affordability Allocation Cap</td>
-                  <td className="p-2 bg-slate-100">{cur(result.affordabilityEligibleLoan)}</td>
+                  <td className="p-2 bg-slate-100">{cur(result.maxLoanProvided)}</td>
                 </tr>
               </tbody>
             </table>
@@ -174,7 +168,6 @@ function LoanProposalPrintLayout({ form, result }) {
         </div>
       </div>
 
-      {/* 3. CREDIT PROFILE ANALYSIS */}
       <div className="mb-6">
         <h2 className="text-xs font-bold text-slate-950 bg-slate-100 p-1 mb-2 uppercase tracking-wider border-l-2 border-slate-900 pl-2">3. Bureau Profile & Credit Risk Grade</h2>
         <table className="w-full border border-slate-300 mb-2">
@@ -191,17 +184,10 @@ function LoanProposalPrintLayout({ form, result }) {
               <td className="p-2 font-bold bg-slate-50">Active Overdue Liability Exposure</td>
               <td className="p-2 font-medium text-red-700">{cur(form.activeOverdueAmount || 0)}</td>
             </tr>
-            <tr>
-              <td className="p-2 font-bold bg-slate-50">Unpaid Cycle Counter (EMI Defaults)</td>
-              <td className="p-2">{form.emiDefaultCount || 0} instance(s)</td>
-              <td className="p-2 font-bold bg-slate-50">Current Unresolved Overdue Count</td>
-              <td className="p-2">{form.overdueEMICount || 0}</td>
-            </tr>
           </tbody>
         </table>
       </div>
 
-      {/* 4. FINANCIAL CAPACITY & RATIO METRICS */}
       <div className="mb-6">
         <h2 className="text-xs font-bold text-slate-950 bg-slate-100 p-1 mb-2 uppercase tracking-wider border-l-2 border-slate-900 pl-2">4. Financial Solvency & Residual Leverage</h2>
         <table className="w-full border border-slate-300">
@@ -214,50 +200,16 @@ function LoanProposalPrintLayout({ form, result }) {
             </tr>
             <tr className="border-b border-slate-300">
               <td className="p-2 bg-slate-50 font-bold">Pre-Existing Obligation Vol (EMI)</td>
-              <td className="p-2">{cur(form.existingEMI || form.monthly_obligations)}</td>
+              <td className="p-2">{cur(result.existingEMI || form.monthly_obligations)}</td>
               <td className="p-2 bg-slate-50 font-bold">Consolidated Aggregate Total EMI Load</td>
               <td className="p-2 font-bold">{cur(result.totalEMI || (result.emi + (form.existingEMI || 0)))}</td>
             </tr>
-            <tr className="border-b border-slate-300">
-              <td className="p-2 bg-slate-50 font-bold">Pre-Application Native Debt To Income (DTI)</td>
-              <td className="p-2">{pct(result.dti * 100)}</td>
-              <td className="p-2 bg-slate-50 font-bold">Post-Execution Aggregate Net DTI Limit</td>
-              <td className="p-2 font-bold text-slate-900">{pct(result.totalDTI * 100)}</td>
-            </tr>
-            <tr>
-              <td className="p-2 bg-slate-50 font-bold">Calculated Liquid Net Surplus Pool</td>
-              <td className="p-2 font-semibold text-green-700">{cur(result.surplus)}</td>
-              <td className="p-2 bg-slate-50 font-bold">Projected Free Liquid Residual Income</td>
-              <td className="p-2 font-bold text-blue-900">{cur(result.projectedResidualIncome)}</td>
-            </tr>
           </tbody>
         </table>
       </div>
 
-      {/* 5. RISK COLLATERAL BOUNDS */}
-      <div className="mb-6">
-        <h2 className="text-xs font-bold text-slate-950 bg-slate-100 p-1 mb-2 uppercase tracking-wider border-l-2 border-slate-900 pl-2">5. Pledged Asset Security Coverage</h2>
-        <table className="w-full border border-slate-300">
-          <tbody>
-            <tr className="border-b border-slate-300">
-              <td className="p-2 bg-slate-50 font-bold w-1/4">Assessed Collateral Core Valuation</td>
-              <td className="p-2 w-1/4 font-semibold">{cur(form.collateral_value)}</td>
-              <td className="p-2 bg-slate-50 font-bold w-1/4">Evaluated Net Loan to Value (LTV) Ratio</td>
-              <td className="p-2 w-1/4 font-bold text-slate-900">{pct(result.ltv)}</td>
-            </tr>
-            <tr>
-              <td className="p-2 bg-slate-50 font-bold">FIOR Structured Eligible Multiplier</td>
-              <td className="p-2">{cur(result.fiorEligibleLoan)}</td>
-              <td className="p-2 bg-slate-50 font-bold">Retained Liquid Capital Cushion (Savings)</td>
-              <td className="p-2">{cur(form.savings_balance)}</td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-
-      {/* 6. COMPLIANCE ASSESSMENT GATES & POLICY SANCTIONS */}
       <div className="mb-8">
-        <h2 className="text-xs font-bold text-slate-950 bg-slate-100 p-1 mb-2 uppercase tracking-wider border-l-2 border-slate-900 pl-2">6. Core Risk Gate Assessment Matrix</h2>
+        <h2 className="text-xs font-bold text-slate-950 bg-slate-100 p-1 mb-2 uppercase tracking-wider border-l-2 border-slate-900 pl-2">5. Core Risk Gate Assessment Matrix</h2>
         <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 mt-2">
           {Object.entries(result.gates).map(([key, status]) => (
             <div key={key} className="flex justify-between items-center py-1.5 px-3 border border-slate-200 bg-slate-50 rounded">
@@ -270,32 +222,6 @@ function LoanProposalPrintLayout({ form, result }) {
             </div>
           ))}
         </div>
-
-        <div className="mt-5">
-          <p className="font-bold text-slate-900 mb-1">Standard Operational Closing Covenants:</p>
-          <ul className="list-decimal pl-4 space-y-1 text-slate-700">
-            <li>Lien processing and verification registration checks must be completed against specified property files prior to any core line allocation.</li>
-            <li>Direct auto-debit assignment parameters must explicitly bind to verified income deposit structures.</li>
-            <li>Adverse variance inside active credit profiles greater than a 50-point bureau reduction indices triggers automated manual reassessment limits.</li>
-          </ul>
-        </div>
-
-        {/* SIGNATURE RUN BLOCK */}
-        <div className="border-t border-slate-400 pt-5 flex justify-between items-center mt-12">
-          <div>
-            <p className="font-bold text-slate-900 uppercase">RECOMMENDED BY AUTHORIZED WORKSTATION ASSET CONTROL</p>
-            <p className="text-slate-500 font-medium">Underwriting Validation Officer | FederalCreditPro Suite Execution</p>
-          </div>
-          <div className="text-right">
-            <p className="font-bold text-slate-800">Verification Engine Log Token</p>
-            <p className="font-mono text-slate-400 text-[10px]">FCP-MD5-{(form.loan_amount || 100).toString(16).toUpperCase()}</p>
-          </div>
-        </div>
-      </div>
-
-      {/* FOOTER */}
-      <div className="text-center text-[9px] text-slate-400 border-t border-dotted border-slate-300 pt-3 uppercase tracking-widest font-semibold">
-        *** SECURE ARCHIVAL RECORD MANIFEST — END OF RETAIL PROPOSAL DOCUMENT ***
       </div>
     </div>
   );
@@ -348,9 +274,6 @@ function SummaryModal({ isOpen, onClose, summary, loading, error }) {
             <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-900 leading-relaxed whitespace-pre-wrap">{summary.summary}</p>
             </div>
-            <p className="text-xs text-muted-foreground text-right">
-              Generated at: {summary.timestamp}
-            </p>
             <div className="flex gap-2">
               <button
                 onClick={() => {
@@ -361,10 +284,7 @@ function SummaryModal({ isOpen, onClose, summary, loading, error }) {
               >
                 Copy to Clipboard
               </button>
-              <button
-                onClick={onClose}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-              >
+              <button onClick={onClose} className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
                 Close
               </button>
             </div>
@@ -376,7 +296,7 @@ function SummaryModal({ isOpen, onClose, summary, loading, error }) {
 }
 
 // ============================================================================
-// COMPONENT 3: MAIN ROUTE ROUTER INTERFACE
+// COMPONENT 3: MAIN UNDERWRITER ROUTE WORKSPACE
 // ============================================================================
 export default function UnderwriterSummary() {
   const navigate = useNavigate();
@@ -385,11 +305,23 @@ export default function UnderwriterSummary() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [isDocxReady, setIsDocxReady] = useState(false);
 
+  // Load CDN Script assets on-the-fly dynamically without using local bash terminal installers
   useEffect(() => {
     const saved = localStorage.getItem("loanApplication");
     if (saved) {
       try { setData(JSON.parse(saved)); } catch {}
+    }
+
+    if (!window.docx) {
+      const script = document.createElement("script");
+      script.src = "https://unpkg.com/docx@8.5.0/build/index.js";
+      script.async = true;
+      script.onload = () => setIsDocxReady(true);
+      document.body.appendChild(script);
+    } else {
+      setIsDocxReady(true);
     }
   }, []);
 
@@ -397,9 +329,7 @@ export default function UnderwriterSummary() {
     setLoading(true);
     setError(null);
     setShowSummaryModal(true);
-
     const result = await summarizeLoanApplication(data.form, data.result);
-    
     setLoading(false);
     if (result.success) {
       setSummary(result);
@@ -407,6 +337,231 @@ export default function UnderwriterSummary() {
       setError(result.error);
       setSummary(null);
     }
+  };
+
+  // CLIENT SIDE DIRECT DOCX BUILD GENERATOR
+  const generateAndDownloadDocx = () => {
+    if (!window.docx) {
+      alert("Word Compilation engine asset is still fetching from CDN network. Please try again in a brief second.");
+      return;
+    }
+
+    const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType, AlignmentType, BorderStyle, HeadingLevel } = window.docx;
+
+    const curVal = (v) => v != null ? `₹ ${Math.round(v).toLocaleString("en-IN")}` : "—";
+    const pctVal = (v) => v != null ? `${v.toFixed(2)}%` : "—";
+    
+    const borderLayout = { style: BorderStyle.SINGLE, size: 4, color: "CCCCCC" };
+    const borders = { top: borderLayout, bottom: borderLayout, left: borderLayout, right: borderLayout, insideH: borderLayout, insideV: borderLayout };
+    const padding = { top: 120, bottom: 120, left: 150, right: 150 };
+
+    const doc = new Document({
+      sections: [{
+        children: [
+          // HEADER TITLE
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 100 },
+            children: [new TextRun({ text: "LOAN PROPOSAL", bold: true, size: 48, color: "0F172A" })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 100 },
+            children: [new TextRun({ text: "Bank Credit Assessment & Underwriting Report", italic: true, size: 24, color: "475569" })],
+          }),
+          new Paragraph({
+            alignment: AlignmentType.CENTER,
+            spacing: { after: 400 },
+            children: [new TextRun({ text: "CONFIDENTIAL - FOR AUTHORIZED USE ONLY", bold: true, size: 18, color: "94A3B8" })],
+          }),
+
+          // META MATRIX
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders,
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({ shading: { fill: "F8FAFC" }, margins: padding, children: [new Paragraph({ children: [new TextRun({ text: "Proposal Number", bold: true })] })] }),
+                  new TableCell({ margins: padding, children: [new Paragraph(`LN-2026-${(form.savings_balance || 5847).toString().slice(-4)}`)] }),
+                  new TableCell({ shading: { fill: "F8FAFC" }, margins: padding, children: [new Paragraph({ children: [new TextRun({ text: "Proposal Date", bold: true })] })] }),
+                  new TableCell({ margins: padding, children: [new Paragraph(new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }))] }),
+                ],
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ shading: { fill: "F8FAFC" }, margins: padding, children: [new Paragraph({ children: [new TextRun({ text: "Loan Product", bold: true })] })] }),
+                  new TableCell({ margins: padding, children: [new Paragraph(form.product)] }),
+                  new TableCell({ shading: { fill: "F8FAFC" }, margins: padding, children: [new Paragraph({ children: [new TextRun({ text: "Underwriter", bold: true })] })] }),
+                  new TableCell({ margins: padding, children: [new Paragraph("Credit Analysis Department")] }),
+                ],
+              }),
+            ],
+          }),
+          new Paragraph({ text: "", spacing: { after: 300 } }),
+
+          // SECTION 1
+          new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 150 }, children: [new TextRun({ text: "1. EXECUTIVE SUMMARY", bold: true, size: 26 })] }),
+          new Paragraph({
+            spacing: { after: 200 },
+            children: [new TextRun(`This document presents a comprehensive credit assessment and underwriting recommendation for the loan application evaluated for ${form.applicant_name || "Applicant"} through our automated core retail underwriting framework.`)]
+          }),
+          new Paragraph({
+            spacing: { after: 200 },
+            children: [
+              new TextRun({ text: "Recommendation Status: ", bold: true }),
+              new TextRun({ text: result.decision === "APPROVE" ? "APPROVED" : "REJECTED", bold: true, color: result.decision === "APPROVE" ? "15803D" : "B91C1C" })
+            ]
+          }),
+
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders,
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({ shading: { fill: "F1F5F9" }, margins: padding, children: [new Paragraph({ children: [new TextRun({ text: "Metric Parameter", bold: true })] })] }),
+                  new TableCell({ shading: { fill: "F1F5F9" }, margins: padding, children: [new Paragraph({ children: [new TextRun({ text: "Sanctioned Assessment Value", bold: true })] })] }),
+                ]
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ margins: padding, children: [new Paragraph("Recommended Max Loan Allocation")] }),
+                  new TableCell({ margins: padding, children: [new Paragraph({ children: [new TextRun({ text: curVal(result.maxLoanProvided), bold: true })] })] }),
+                ]
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ margins: padding, children: [new Paragraph("Approved Loan Tenure")] }),
+                  new TableCell({ margins: padding, children: [new Paragraph(`${form.tenure_months} months`)] }),
+                ]
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ margins: padding, children: [new Paragraph("Interest Rate Index")] }),
+                  new TableCell({ margins: padding, children: [new Paragraph({ children: [new TextRun({ text: pctVal(result.finalRate), bold: true })] })] }),
+                ]
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ margins: padding, children: [new Paragraph("Calculated Monthly Instalment (EMI)")] }),
+                  new TableCell({ margins: padding, children: [new Paragraph({ children: [new TextRun({ text: curVal(result.emi), bold: true })] })] }),
+                ]
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ shading: { fill: "F8FAFC" }, margins: padding, children: [new Paragraph("Aggregate Outflow Maturity Value")] }),
+                  new TableCell({ shading: { fill: "F8FAFC" }, margins: padding, children: [new Paragraph({ children: [new TextRun({ text: curVal(result.totalAmountPaid), bold: true })] })] }),
+                ]
+              }),
+            ]
+          }),
+          new Paragraph({ text: "", spacing: { after: 300 } }),
+
+          // SECTION 2
+          new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 150 }, children: [new TextRun({ text: "2. LOAN DETAILS & SANCTIONED TERMS", bold: true, size: 26 })] }),
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders,
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({ shading: { fill: "F8FAFC" }, margins: padding, children: [new Paragraph("Requested Funding Capital")] }),
+                  new TableCell({ margins: padding, children: [new Paragraph(curVal(form.loan_amount))] }),
+                ]
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ shading: { fill: "F8FAFC" }, margins: padding, children: [new Paragraph("Pledged Asset Margin Valuation")] }),
+                  new TableCell({ margins: padding, children: [new Paragraph(curVal(form.collateral_value))] }),
+                ]
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ shading: { fill: "F8FAFC" }, margins: padding, children: [new Paragraph("Aggregate Yield Outflow Interest")] }),
+                  new TableCell({ margins: padding, children: [new Paragraph(curVal(result.totalInterestPaid))] }),
+                ]
+              }),
+            ]
+          }),
+          new Paragraph({ text: "", spacing: { after: 300 } }),
+
+          // SECTION 3
+          new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 150 }, children: [new TextRun({ text: "3. BUREAU PROFILE & CREDIT ANALYSIS", bold: true, size: 26 })] }),
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders,
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({ shading: { fill: "F8FAFC" }, margins: padding, children: [new Paragraph("Bureau Score Index")] }),
+                  new TableCell({ margins: padding, children: [new Paragraph(`${form.cibil_score} / 900`)] }),
+                  new TableCell({ shading: { fill: "F8FAFC" }, margins: padding, children: [new Paragraph("Weighted Score Factor")] }),
+                  new TableCell({ margins: padding, children: [new Paragraph(pctVal(result.weightedScore))] }),
+                ]
+              }),
+            ]
+          }),
+          new Paragraph({ text: "", spacing: { after: 300 } }),
+
+          // SECTION 4
+          new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 150 }, children: [new TextRun({ text: "4. FINANCIAL SOLVENCY & AFFORDABILITY", bold: true, size: 26 })] }),
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            borders,
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({ shading: { fill: "F8FAFC" }, margins: padding, children: [new Paragraph("Operating Net Monthly Income")] }),
+                  new TableCell({ margins: padding, children: [new Paragraph(curVal(form.monthly_income))] }),
+                ]
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ shading: { fill: "F8FAFC" }, margins: padding, children: [new Paragraph("Post-Execution Debt-To-Income (DTI)")] }),
+                  new TableCell({ margins: padding, children: [new Paragraph(pctVal(result.totalDTI * 100))] }),
+                ]
+              }),
+              new TableRow({
+                children: [
+                  new TableCell({ shading: { fill: "F8FAFC" }, margins: padding, children: [new Paragraph("Free Liquid Residual Income Pool")] }),
+                  new TableCell({ margins: padding, children: [new Paragraph(curVal(result.projectedResidualIncome))] }),
+                ]
+              }),
+            ]
+          }),
+          new Paragraph({ text: "", spacing: { after: 300 } }),
+
+          // SECTION 5
+          new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 200, after: 150 }, children: [new TextRun({ text: "5. CORE RISK VALIDATION POLICY GATES", bold: true, size: 26 })] }),
+          ...Object.entries(result.gates).map(([key, status]) => {
+            return new Paragraph({
+              bullet: { level: 0 },
+              children: [
+                new TextRun({ text: `${gateLabelsMap[key] || key}: `, bold: true }),
+                new TextRun({ text: status === "PASS" ? "✓ PASS" : "🗙 REJECT", bold: true, color: status === "PASS" ? "15803D" : "B91C1C" })
+              ]
+            });
+          }),
+          new Paragraph({ text: "", spacing: { after: 400 } }),
+
+          new Paragraph({ children: [new TextRun({ text: "RECOMMENDED FOR IMMEDIATE DISBURSEMENT", bold: true, size: 22, color: "15803D" })] }),
+          new Paragraph({ children: [new TextRun({ text: "Credit Analysis Department Underwriting Officer" })] }),
+          new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 300 }, children: [new TextRun({ text: "*** END OF PROPOSAL MANIFEST ***", size: 16, color: "94A3B8" })] }),
+        ]
+      }]
+    });
+
+    Packer.toBlob(doc).then((blob) => {
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Loan_Proposal_${form.applicant_name || "Manifest"}.docx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    });
   };
 
   if (!data) {
@@ -426,18 +581,9 @@ export default function UnderwriterSummary() {
 
   return (
     <div className="min-h-screen bg-[hsl(215,30%,97%)]">
-      {/* Modals */}
-      <SummaryModal
-        isOpen={showSummaryModal}
-        onClose={() => setShowSummaryModal(false)}
-        summary={summary}
-        loading={loading}
-        error={error}
-      />
+      <SummaryModal isOpen={showSummaryModal} onClose={() => setShowSummaryModal(false)} summary={summary} loading={loading} error={error} />
 
-      {/* WORKSTATION ROUTE VIEW LAYER (HIDDEN AUTOMATICALLY BY PRINT ENGINE) */}
       <div className="print:hidden">
-        {/* Header */}
         <header className="bg-[hsl(224,58%,33%)] text-white shadow-lg">
           <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -446,19 +592,20 @@ export default function UnderwriterSummary() {
               </button>
               <div>
                 <h1 className="font-bold text-base">Underwriter Credit Summary</h1>
-                <p className="text-xs text-blue-200">FederalCreditPro — Loan Assessment Report</p>
+                <p className="text-xs text-blue-200">FederalCreditPro — Automated Dashboard</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
-              <button 
-                onClick={handleSummarize}
-                disabled={loading}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg border border-purple-400 text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                <Sparkles className="w-4 h-4" /> 
-                {loading ? "Summarizing..." : "Summarize"}
+              <button onClick={handleSummarize} disabled={loading} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-purple-400 text-sm font-medium hover:bg-blue-700 transition-colors disabled:opacity-50">
+                <Sparkles className="w-4 h-4" /> Summary
               </button>
-              <button onClick={() => window.print()} className="flex items-center gap-2 px-4 py-2 rounded-lg border border-blue-400 text-sm font-medium hover:bg-blue-700 transition-colors">
+
+              {/* ACTION LINK WITH NO BASH/TERMINAL DEPENDENCIES AT ALL */}
+              <button onClick={generateAndDownloadDocx} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-emerald-400 text-sm font-medium text-emerald-300 hover:bg-emerald-800 transition-colors">
+                <FileText className="w-4 h-4" /> Download Word (.docx)
+              </button>
+
+              <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-400 text-sm font-medium hover:bg-blue-700 transition-colors">
                 <Printer className="w-4 h-4" /> Print / PDF
               </button>
             </div>
@@ -466,130 +613,55 @@ export default function UnderwriterSummary() {
         </header>
 
         <main className="max-w-5xl mx-auto px-4 py-6 space-y-6">
-          {/* Decision Banner */}
           <div className={`rounded-xl border-2 ${decisionBorder} bg-white shadow-lg p-6 flex items-center justify-between`}>
             <div>
               <p className="text-xs text-muted-foreground font-medium uppercase tracking-wide mb-1">Final Underwriting Decision</p>
               <p className="text-3xl font-extrabold text-foreground">{form.applicant_name || "Applicant"}</p>
               <p className="text-sm text-muted-foreground mt-1">{form.product} · {form.tenure_months} months · {fmt(form.loan_amount)}</p>
             </div>
-            <span className={`${decisionColor} text-white text-xl font-extrabold px-8 py-3 rounded-xl`}>
-              {result.decision}
-            </span>
+            <span className={`${decisionColor} text-white text-xl font-extrabold px-8 py-3 rounded-xl`}>{result.decision}</span>
           </div>
 
-          {/* Summary Grid */}
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
               { label: "Monthly Income", value: fmt(form.monthly_income) },
-              { label: "Existing EMI", value: fmt(result.existingEMI) },
               { label: "New EMI", value: fmt(result.emi) },
-              { label: "Total EMI", value: fmt(result.totalEMI || result.existingEMI + result.emi) },
-              { label: "Monthly Surplus", value: fmt(result.surplus) },
-              { label: "Projected Residual Income", value: fmt(result.projectedResidualIncome), highlight: result.projectedResidualIncome <= 0 ? "red" : "green" },
               { label: "Interest Rate", value: `${result.finalRate.toFixed(2)}%` },
-              { label: "Credit Score", value: `${result.weightedScore.toFixed(1)}/100` },
               { label: "LTV Ratio", value: `${result.ltv.toFixed(1)}%` },
-              { label: "Current DTI", value: `${(result.dti * 100).toFixed(1)}%` },
               { label: "Total DTI", value: `${(result.totalDTI * 100).toFixed(1)}%` },
-              { label: "NIM", value: `${result.nimPct.toFixed(2)}%` },
-              { label: "Total Payable", value: fmt(result.totalAmountPaid) },
-              { label: "Total Interest", value: fmt(result.totalInterestPaid) },
-              { label: "Requested Loan Amount", value: fmt(result.requestedLoanAmount) },
-              { label: "Property / Pledged Value", value: fmt(form.collateral_value) },
-              { label: "LTV Eligible Amount", value: fmt(result.ltvEligibleLoan) },
-              { label: "Affordability Eligible Amount", value: fmt(result.affordabilityEligibleLoan) },
-              { label: "FIOR Eligible Amount", value: fmt(result.fiorEligibleLoan) },
-              { label: "MAX LOAN PROVIDED", value: fmt(result.maxLoanProvided), highlight: result.maxLoanProvided < result.requestedLoanAmount ? "amber" : "green" },
+              { label: "Projected Residual Income", value: fmt(result.projectedResidualIncome) },
+              { label: "Total Interest Outflow", value: fmt(result.totalInterestPaid) },
+              { label: "MAX LOAN PROVIDED", value: fmt(result.maxLoanProvided) },
             ].map((item) => (
-              <div key={item.label} className={`rounded-xl shadow p-4 ${
-                item.highlight === "red" ? "bg-red-50 border border-red-200" : 
-                item.highlight === "green" ? "bg-green-50 border border-green-200" : 
-                item.highlight === "amber" ? "bg-amber-50 border border-amber-200" :
-                "bg-white"
-              }`}>
+              <div key={item.label} className="rounded-xl shadow p-4 bg-white">
                 <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">{item.label}</p>
-                <p className={`text-lg font-bold ${
-                  item.highlight === "red" ? "text-red-700" : 
-                  item.highlight === "green" ? "text-green-700" : 
-                  item.highlight === "amber" ? "text-amber-700" :
-                  "text-foreground"
-                }`}>{item.value}</p>
+                <p className="text-lg font-bold text-slate-800">{item.value}</p>
               </div>
             ))}
           </div>
 
-          {/* Applicant Details & Credit Summary side by side */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Applicant Details */}
             <div className="bg-white rounded-xl shadow-lg p-5">
-              <h3 className="flex items-center gap-2 font-semibold text-base mb-4">
-                <User className="w-5 h-5 text-blue-700" /> Applicant Details
-              </h3>
+              <h3 className="flex items-center gap-2 font-semibold text-base mb-4"><User className="w-5 h-5 text-blue-700" /> Applicant Particulars</h3>
               <div className="space-y-2 text-sm">
                 {[
-                  ["Name", form.applicant_name || "—"],
-                  ["Product", form.product],
-                  ["Tenure", `${form.tenure_months} months`],
-                  ["CIBIL Score", form.cibil_score],
-                  ["Occupation", form.occupationType || "—"],
-                  ["Age", form.applicantAge ? `${form.applicantAge} years` : "—"],
-                  ["Monthly Income", fmt(form.monthly_income)],
-                  ["Existing Obligations (used in DTI/FIOR)", fmt(result.existingEMI || 0)],
-                  ["Monthly Spends", fmt(form.monthly_spends)],
-                  ["Savings Balance", fmt(form.savings_balance)],
-                  ["Requested Loan Amount", fmt(result.requestedLoanAmount)],
-                  ["Property / Pledged Value", fmt(form.collateral_value)],
-                  ["LTV Eligible Amount", fmt(result.ltvEligibleLoan)],
-                  ["Affordability Eligible Amount", fmt(result.affordabilityEligibleLoan)],
-                  ["FIOR Eligible Amount", fmt(result.fiorEligibleLoan)],
-                  ["MAX LOAN PROVIDED", fmt(result.maxLoanProvided)],
+                  ["Applicant Name", form.applicant_name || "—"],
+                  ["Loan Product Assigned", form.product],
+                  ["Tenure Period", `${form.tenure_months} months`],
+                  ["Raw Credit Bureau Score", form.cibil_score],
+                  ["Pledged Core Value", fmt(form.collateral_value)],
+                  ["Max Allocatable Capital", fmt(result.maxLoanProvided)],
                 ].map(([k, v]) => (
                   <div key={k} className="flex justify-between py-1 border-b border-gray-50">
                     <span className="text-muted-foreground font-medium">{k}</span>
-                    <span className="font-semibold">{v}</span>
+                    <span className="font-semibold text-slate-900">{v}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            {/* Credit Summary */}
             <div className="bg-white rounded-xl shadow-lg p-5">
-              <h3 className="flex items-center gap-2 font-semibold text-base mb-4">
-                <ShieldCheck className="w-5 h-5 text-blue-700" /> Credit Summary
-              </h3>
-              <div className="space-y-2 text-sm">
-                {[
-                  ["Past Defaults", form.past_defaults, form.past_defaults > 0 ? "amber" : "white"],
-                  ...(form.activeOverdueAmount > 0 ? [["Active Overdue", fmt(form.activeOverdueAmount), "red"]] : []),
-                  ...(form.emiDefaultCount > 0 ? [["EMI Defaults", form.emiDefaultCount, "orange"]] : []),
-                  ...(form.overdueEMICount > 0 ? [["Overdue EMIs", form.overdueEMICount, "orange"]] : []),
-                  ["Current Residual Income", fmt(result.currentSurplus), result.currentSurplus > 0 ? "green" : "red"],
-                  ["Projected Residual Income", fmt(result.projectedResidualIncome), result.projectedResidualIncome > 0 ? "green" : "red"],
-                ].map(([k, v, color]) => {
-                  const bgClass = color === "red" ? "bg-red-50 border-red-200" : 
-                                 color === "green" ? "bg-green-50 border-green-200" : 
-                                 color === "amber" ? "bg-amber-50 border-amber-200" : 
-                                 color === "orange" ? "bg-orange-50 border-orange-200" : "bg-white";
-                  const textClass = color === "red" ? "text-red-700" : 
-                                   color === "green" ? "text-green-700" : 
-                                   color === "amber" ? "text-amber-700" : 
-                                   color === "orange" ? "text-orange-700" : "text-foreground";
-                  return (
-                    <div key={k} className={`flex justify-between py-2 px-2 rounded border ${bgClass}`}>
-                      <span className="text-muted-foreground font-medium">{k}</span>
-                      <span className={`font-semibold ${textClass}`}>{v}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Gate Checks */}
-            <div className="bg-white rounded-xl shadow-lg p-5">
-              <h3 className="flex items-center gap-2 font-semibold text-base mb-4">
-                <ShieldCheck className="w-5 h-5 text-blue-700" /> Gate Checks & Decision
-              </h3>
+              <h3 className="flex items-center gap-2 font-semibold text-base mb-4"><ShieldCheck className="w-5 h-5 text-blue-700" /> Core Compliance Policy Gates</h3>
               <div className="space-y-2">
                 {Object.entries(result.gates).map(([key, status]) => (
                   <div key={key} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
@@ -598,123 +670,11 @@ export default function UnderwriterSummary() {
                   </div>
                 ))}
               </div>
-              
-              {/* Key Metrics for Decision */}
-              <div className="mt-4 pt-4 border-t border-gray-100 space-y-2 text-sm">
-                {result.creditRisk?.hasCreditRisk && (
-                  <div className="flex justify-between p-2 rounded bg-red-50 text-red-700 border border-red-200">
-                    <span className="font-medium">⚠️ Credit Risk</span>
-                    <span className="font-semibold">YES</span>
-                  </div>
-                )}
-              </div>
             </div>
           </div>
-
-          {/* Score Breakdown */}
-          <div className="bg-white rounded-xl shadow-lg p-5">
-            <h3 className="font-semibold text-base mb-4 flex items-center gap-2">
-              <IndianRupee className="w-5 h-5 text-blue-700" /> Score Breakdown &amp; Rate Derivation
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-              {Object.entries(result.scores).map(([key, val]) => (
-                <div key={key} className="text-center p-3 bg-slate-50 rounded-lg">
-                  <p className="text-xs text-muted-foreground capitalize mb-1">{key}</p>
-                  <p className="text-lg font-bold">{val}/100</p>
-                  <div className="h-1.5 rounded-full bg-gray-200 mt-1 overflow-hidden">
-                    <div className="h-full rounded-full bg-blue-500" style={{ width: `${val}%` }} />
-                  </div>
-                </div>
-              ))}
-            </div>
-            <div className="grid grid-cols-3 gap-4 text-sm text-center">
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">Rate Band</p>
-                <p className="font-bold">{result.rateBand.min}% – {result.rateBand.max}%</p>
-              </div>
-              <div className="p-3 bg-yellow-50 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">Final Rate</p>
-                <p className="font-bold text-yellow-700">{result.finalRate.toFixed(2)}%</p>
-              </div>
-              <div className="p-3 bg-green-50 rounded-lg">
-                <p className="text-xs text-muted-foreground mb-1">NIM</p>
-                <p className="font-bold text-green-700">{result.nimPct.toFixed(2)}%</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Decision Reason Codes & Risk Factors */}
-          {(result.reasonCodes && result.reasonCodes.length > 0) && (
-            <div className="bg-white rounded-xl shadow-lg p-5">
-              <h3 className="font-semibold text-base mb-4 text-amber-700">📋 Decision Reason Codes & Risk Factors</h3>
-              <div className="space-y-3">
-                {result.reasonCodes.map((r) => {
-                  const bgColor =
-                    r.severity === "CRITICAL" ? "bg-red-50 border-red-200" :
-                    r.severity === "HIGH" ? "bg-orange-50 border-orange-200" :
-                    r.severity === "MEDIUM" ? "bg-amber-50 border-amber-200" :
-                    "bg-blue-50 border-blue-200";
-                  return (
-                    <div key={r.code} className={`flex items-start gap-3 p-3 rounded-lg border ${bgColor}`}>
-                      <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded shrink-0 ${bgColor.replace("50", "100")}`}>
-                        {r.code}
-                      </span>
-                      <div className="flex-1">
-                        <p className="text-sm font-semibold">{r.label}</p>
-                        <p className="text-xs mt-0.5">{r.detail}</p>
-                      </div>
-                      <span className={`text-xs font-semibold shrink-0 px-2 py-1 rounded whitespace-nowrap ${
-                        r.severity === "CRITICAL" || r.severity === "HIGH" ? "bg-red-100 text-red-700" :
-                        r.severity === "MEDIUM" ? "bg-amber-100 text-amber-700" :
-                        "bg-blue-100 text-blue-700"
-                      }`}>
-                        {r.severity}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* Amortization preview */}
-          <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-100">
-              <h3 className="font-semibold text-base">Amortization Schedule (First 12 Months)</h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-slate-50 text-xs font-semibold text-muted-foreground uppercase">
-                    <th className="px-4 py-3 text-center">Month</th>
-                    <th className="px-4 py-3 text-right">Payment</th>
-                    <th className="px-4 py-3 text-right">Principal</th>
-                    <th className="px-4 py-3 text-right">Interest</th>
-                    <th className="px-4 py-3 text-right">Balance</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {result.amortization.map((row) => (
-                    <tr key={row.month} className="border-t border-gray-50 hover:bg-slate-50">
-                      <td className="px-4 py-2 text-center font-medium">{row.month}</td>
-                      <td className="px-4 py-2 text-right">{`₹${Math.round(row.payment).toLocaleString("en-IN")}`}</td>
-                      <td className="px-4 py-2 text-right text-green-700">{`₹${Math.round(row.principal).toLocaleString("en-IN")}`}</td>
-                      <td className="px-4 py-2 text-right text-red-600">{`₹${Math.round(row.interest).toLocaleString("en-IN")}`}</td>
-                      <td className="px-4 py-2 text-right font-semibold">{`₹${Math.round(row.balance).toLocaleString("en-IN")}`}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <p className="text-xs text-center text-muted-foreground pb-6">
-            Generated by FederalCreditPro · {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}
-          </p>
         </main>
       </div>
 
-      {/* DYNAMIC BLUEPRINT LOADER (ACTIVATED ONLY DURING NATIVE PRINT ACTIONS) */}
       <LoanProposalPrintLayout form={form} result={result} />
     </div>
   );
