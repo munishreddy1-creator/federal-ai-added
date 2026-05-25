@@ -1,5 +1,8 @@
 const GEMINI_API_URL =
-  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent";
+  "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:streamGenerateContent";
+
+// Simple in-memory cache (use Redis for production)
+const summaryCache = new Map();
 
 function currency(value) {
   return Math.round(value || 0).toLocaleString("en-IN");
@@ -65,99 +68,233 @@ function buildFallbackNarrative(form, result) {
   ].join("\n");
 }
 
+// OPTIMIZED: More concise data formatting to reduce token count
 function formatApplicationForSummarization(form, result) {
-  return `
-UNDERWRITER CREDIT SUMMARY SOURCE DATA
-======================================
+  return `CREDIT SUMMARY DATA
+==================
 
-APPLICANT INFORMATION:
-- Name: ${form.applicant_name || "N/A"}
-- Product: ${form.product}
-- Tenure: ${form.tenure_months} months
-- CIBIL Score: ${form.cibil_score}
-- Occupation: ${form.occupationType || "N/A"}
-- Age: ${form.applicantAge ? `${form.applicantAge} years` : "N/A"}
+APPLICANT: ${form.applicant_name || "N/A"} | ${form.occupationType || "N/A"} | Age: ${form.applicantAge || "N/A"}
+PRODUCT: ${form.product} for ${form.tenure_months} months
 
-FINANCIAL PROFILE:
+FINANCIAL:
 - Monthly Income: INR ${currency(form.monthly_income)}
 - Existing EMI: INR ${currency(result.existingEMI)}
-- Monthly Spends: INR ${currency(form.monthly_spends)}
-- Savings Balance: INR ${currency(form.savings_balance)}
-- Current Monthly Surplus: INR ${currency(result.currentSurplus || result.surplus)}
-- Projected Residual Income After New EMI: INR ${currency(result.projectedResidualIncome)}
-
-CREDIT ASSESSMENT:
-- Weighted Credit Score: ${result.weightedScore.toFixed(1)}/100
-- Past Defaults: ${form.past_defaults}
-- EMI Default Count: ${result.emiDefaultCount || 0}
-- Overdue EMI Count: ${result.overdueEMICount || 0}
-- Active Overdue Amount: INR ${currency(result.activeOverdueAmount)}
-
-LOAN DETAILS:
-- Requested Loan Amount: INR ${currency(result.requestedLoanAmount)}
-- Collateral Value: INR ${currency(form.collateral_value)}
-- LTV Ratio: ${result.ltv.toFixed(2)}%
-- LTV Cap: ${result.ltvCap}%
 - New EMI: INR ${currency(result.emi)}
 - Total EMI: INR ${currency(result.totalEMI)}
-- Total Payable: INR ${currency(result.totalAmountPaid)}
+- Residual Income (post-new EMI): INR ${currency(result.projectedResidualIncome)}
+- Monthly Spends: INR ${currency(form.monthly_spends)}
+
+CREDIT:
+- CIBIL: ${form.cibil_score}
+- Weighted Score: ${result.weightedScore.toFixed(1)}/100
+- Past Defaults: ${form.past_defaults}
+- EMI Defaults: ${result.emiDefaultCount || 0}
+- Active Overdue: INR ${currency(result.activeOverdueAmount)}
+
+LOAN:
+- Requested: INR ${currency(result.requestedLoanAmount)}
+- Collateral Value: INR ${currency(form.collateral_value)}
+- LTV: ${result.ltv.toFixed(2)}% (Cap: ${result.ltvCap}%)
+- Interest Rate: ${result.finalRate.toFixed(2)}%
 - Total Interest: INR ${currency(result.totalInterestPaid)}
 
-FINANCIAL RATIOS:
-- DTI Current: ${(result.dti * 100).toFixed(2)}%
-- DTI Total: ${(result.totalDTI * 100).toFixed(2)}%
-- FIOR Ratio: ${(result.fiorRatio * 100).toFixed(2)}%
-- Spend-to-Income Ratio: ${(result.spendToIncome * 100).toFixed(2)}%
+RATIOS:
+- DTI (current): ${(result.dti * 100).toFixed(2)}%
+- DTI (total): ${(result.totalDTI * 100).toFixed(2)}%
+- Spend-to-Income: ${(result.spendToIncome * 100).toFixed(2)}%
 
-GATE RESULTS:
-- Gate Summary: ${gateSummary(result.gates)}
-- CIBIL Gate: ${result.gates.cibil}
-- Spend-to-Income Gate: ${result.gates.spend}
-- DTI Gate: ${result.gates.dti}
-- LTV Gate: ${result.gates.ltv}
-- EMI Affordability Gate: ${result.gates.emi}
-- Stress Test Gate: ${result.gates.stress}
-- Residual Income Gate: ${result.gates.residual}
+GATES: ${gateSummary(result.gates)}
+- CIBIL: ${result.gates.cibil}
+- Spend-to-Income: ${result.gates.spend}
+- DTI: ${result.gates.dti}
+- LTV: ${result.gates.ltv}
+- EMI Affordability: ${result.gates.emi}
+- Stress Test: ${result.gates.stress}
+- Residual Income: ${result.gates.residual}
 
-UNDERWRITING DECISION:
+DECISION:
 - Decision: ${result.decision}
-- Decision Reason: ${result.decisionReason || "N/A"}
-- Interest Rate: ${result.finalRate.toFixed(2)}%
-- NIM: ${result.nimPct.toFixed(2)}%
-- LTV Eligible Amount: INR ${currency(result.ltvEligibleLoan)}
-- Affordability Eligible Amount: INR ${currency(result.affordabilityEligibleLoan)}
-- FIOR Eligible Amount: INR ${currency(result.fiorEligibleLoan)}
-- Underwriting Eligible Amount: INR ${currency(result.underwritingEligibleLoan)}
-- MAX LOAN PROVIDED: INR ${currency(result.maxLoanProvided)}
-- Final Approved Loan Amount: INR ${currency(result.approvedLoanAmount)}
-- FIOR Sanction Status: ${result.fiorSanction?.status || "N/A"}
-- FIOR Adjustment Reason: ${result.fiorAdjustmentReason || "None"}
+- Reason: ${result.decisionReason || "N/A"}
+- Max Loan: INR ${currency(result.maxLoanProvided)}
+- Approved Amount: INR ${currency(result.approvedLoanAmount)}
 
 RISK FACTORS:
 ${result.reasonCodes?.length
-  ? result.reasonCodes.map((reason) => `- [${reason.severity}] ${reason.label}: ${reason.detail}`).join("\n")
-  : "- No risk factors identified"}
+  ? result.reasonCodes.map((reason) => `[${reason.severity}] ${reason.label}`).join("\n")
+  : "None identified"}
 `;
 }
 
+// OPTIMIZED: More concise prompt to reduce token count
 function buildSummarizationPrompt(form, result) {
-  return `You are writing the underwriting note for the exact credit summary below.
+  return `Write a concise underwriting note using ONLY the data below. No inferences or invented details.
 
-Rules:
-- Use only the supplied source data. Do not infer missing values, invent policy rules, or contradict the final decision.
-- The first line must be "Decision: <decision> - <decision reason>" using the supplied decision and decision reason.
-- The next line must be "Recommended amount: INR <amount>" using MAX LOAN PROVIDED.
-- Then write these headings exactly: "Applicant and request", "Credit and affordability", "Decision drivers", "Risk and action".
-- Under each heading write 1-3 concise bullet points.
-- Mention the product, requested loan amount, tenure, CIBIL score, monthly income, total EMI, projected residual income, final interest rate, LTV ratio and LTV cap.
-- Summarize gate results. If every gate passes, say all gates pass. If any gate is MANUAL or REJECT, name those gates and statuses.
-- Mention risk factors only when they appear in the source data. If none are present, say no reason-coded risk factors were identified.
-- Keep the note professional and underwriter-facing. Avoid marketing language, markdown emphasis, and generic praise.
+FORMAT:
+Line 1: Decision: <decision> - <reason>
+Line 2: Recommended amount: INR <MAX LOAN PROVIDED>
 
-SOURCE DATA:
+Then use these headings: "Applicant and request", "Credit and affordability", "Decision drivers", "Risk and action"
+
+Each section: 1-3 bullet points max.
+
+CONTENT REQUIREMENTS:
+- Product, tenure, loan amount, CIBIL, monthly income
+- Total EMI, residual income, final rate, LTV ratio
+- Gate status (pass/fail)
+- Risk factors if present
+- Professional tone only
+
+DATA:
 ${formatApplicationForSummarization(form, result)}
 
-Return only the underwriting note.`;
+Return ONLY the underwriting note.`;
+}
+
+// Generate unique cache key for an application
+function generateCacheKey(form, result) {
+  const key = `${form.applicant_name}_${result.requestedLoanAmount}_${form.cibil_score}`;
+  return Buffer.from(key).toString("base64");
+}
+
+// Retry logic with exponential backoff
+async function retryWithBackoff(
+  fetchFn,
+  maxRetries = 3,
+  initialDelayMs = 1000
+) {
+  let lastError;
+
+  for (let attempt = 0; attempt < maxRetries; attempt++) {
+    try {
+      return await fetchFn();
+    } catch (error) {
+      lastError = error;
+
+      // Check if it's a rate limit or quota error
+      const isQuotaError =
+        error.status === 429 ||
+        error.message?.includes("RESOURCE_EXHAUSTED") ||
+        error.message?.includes("QUOTA");
+
+      // Only retry on quota/rate limit errors
+      if (!isQuotaError && attempt > 0) {
+        throw error;
+      }
+
+      if (attempt < maxRetries - 1) {
+        const delayMs = initialDelayMs * Math.pow(2, attempt);
+        console.log(
+          `Retry attempt ${attempt + 1}/${maxRetries} after ${delayMs}ms...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+
+  throw lastError;
+}
+
+// Stream-based API call (handles large responses better)
+async function callGeminiWithStreaming(prompt, apiKey) {
+  let fullResponse = "";
+  let retryCount = 0;
+  const maxRetries = 3;
+  let initialDelay = 2000;
+
+  const attemptCall = async () => {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 30000); // 30s timeout for streaming
+
+    try {
+      const response = await fetch(GEMINI_API_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
+        },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: prompt }] }],
+          generationConfig: {
+            temperature: 0.2,
+            maxOutputTokens: 800,
+          },
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeout);
+
+      // Handle rate limit errors specifically
+      if (response.status === 429 || response.status === 503) {
+        const errorData = await response.json().catch(() => ({}));
+        const error = new Error(
+          errorData.error?.message || "Rate limit exceeded"
+        );
+        error.status = response.status;
+        throw error;
+      }
+
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(
+          errorData.error?.message || `API error: ${response.status}`
+        );
+      }
+
+      // Process streaming response
+      const reader = response.body?.getReader();
+      if (!reader) throw new Error("No response body");
+
+      const decoder = new TextDecoder();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        const chunk = decoder.decode(value, { stream: true });
+        const lines = chunk.split("\n").filter((line) => line.trim());
+
+        for (const line of lines) {
+          try {
+            const json = JSON.parse(line);
+            const text = json.candidates?.[0]?.content?.parts
+              ?.map((part) => part.text || "")
+              .join("");
+            if (text) fullResponse += text;
+          } catch {
+            // Skip non-JSON lines
+          }
+        }
+      }
+
+      return fullResponse.trim();
+    } catch (error) {
+      clearTimeout(timeout);
+      throw error;
+    }
+  };
+
+  // Retry logic
+  while (retryCount < maxRetries) {
+    try {
+      return await attemptCall();
+    } catch (error) {
+      retryCount++;
+
+      if (
+        (error.status === 429 || error.message?.includes("Rate limit")) &&
+        retryCount < maxRetries
+      ) {
+        const delayMs = initialDelay * Math.pow(2, retryCount - 1);
+        console.log(
+          `Rate limited. Retrying in ${delayMs}ms (attempt ${retryCount}/${maxRetries})...`
+        );
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      } else {
+        throw error;
+      }
+    }
+  }
 }
 
 async function readJsonBody(req) {
@@ -196,46 +333,46 @@ export function createGeminiSummaryMiddleware(apiKey) {
       const fallbackSummary = buildFallbackNarrative(form, result);
       let summary = fallbackSummary;
 
-      try {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 5000);
-        const response = await fetch(GEMINI_API_URL, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "x-goog-api-key": apiKey,
-          },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: buildSummarizationPrompt(form, result) }] }],
-            generationConfig: {
-              temperature: 0.2,
-              maxOutputTokens: 700,
-            },
-          }),
-          signal: controller.signal,
-        });
-        clearTimeout(timeout);
+      // Check cache first
+      const cacheKey = generateCacheKey(form, result);
+      if (summaryCache.has(cacheKey)) {
+        console.log("Using cached summary...");
+        summary = summaryCache.get(cacheKey);
+      } else {
+        // Try Gemini API with streaming and retry logic
+        try {
+          const prompt = buildSummarizationPrompt(form, result);
+          const generatedSummary = await callGeminiWithStreaming(
+            prompt,
+            apiKey
+          );
 
-        const data = await response.json();
-        const generatedSummary = data.candidates?.[0]?.content?.parts
-          ?.map((part) => part.text || "")
-          .join("")
-          .trim();
-
-        if (response.ok && generatedSummary) {
-          summary = generatedSummary;
+          if (generatedSummary && generatedSummary.length > 10) {
+            summary = generatedSummary;
+            // Cache the result (max 100 entries)
+            if (summaryCache.size > 100) {
+              const firstKey = summaryCache.keys().next().value;
+              summaryCache.delete(firstKey);
+            }
+            summaryCache.set(cacheKey, summary);
+          }
+        } catch (error) {
+          console.error("Gemini API error:", error.message);
+          // Fall back to template if API fails
+          summary = fallbackSummary;
         }
-      } catch {
-        summary = fallbackSummary;
       }
 
       sendJson(res, 200, {
         snapshot,
         summary,
         timestamp: new Date().toLocaleString("en-IN"),
+        cached: summaryCache.has(cacheKey),
       });
     } catch (error) {
-      sendJson(res, 500, { error: error.message || "Failed to summarize application." });
+      sendJson(res, 500, {
+        error: error.message || "Failed to summarize application.",
+      });
     }
   };
 }
