@@ -21,6 +21,61 @@ function GateBadge({ status }) {
   return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-100 text-red-700 border border-red-200"><ShieldX className="w-3 h-3" />REJECT</span>;
 }
 
+// INLINE FIX: Added the missing SummaryModal component
+function SummaryModal({ isOpen, onClose, summary, loading, error }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[85vh] border border-gray-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 bg-slate-50">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-5 h-5 text-purple-600" />
+            <h3 className="font-bold text-slate-900 text-base">AI Executive Executive Insights</h3>
+          </div>
+          <button onClick={onClose} className="p-1 rounded-lg text-gray-400 hover:bg-gray-200 hover:text-gray-600 transition-colors">
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Content Box */}
+        <div className="p-6 overflow-y-auto flex-1 text-sm leading-relaxed text-slate-700 space-y-4">
+          {loading && (
+            <div className="flex flex-col items-center justify-center py-12 gap-3">
+              <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin"></div>
+              <p className="text-muted-foreground text-xs font-medium">Synthesizing credit evaluation notes...</p>
+            </div>
+          )}
+
+          {error && (
+            <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 flex items-start gap-2">
+              <ShieldX className="w-5 h-5 shrink-0 mt-0.5" />
+              <div>
+                <p className="font-semibold">Summary Generation Failed</p>
+                <p className="text-xs text-red-600/90 mt-0.5">{error}</p>
+              </div>
+            </div>
+          )}
+
+          {!loading && !error && summary && (
+            <div className="whitespace-pre-line font-mono bg-slate-950 text-slate-200 p-4 rounded-lg border border-slate-800 text-xs shadow-inner">
+              {summary.text || JSON.stringify(summary, null, 2)}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div className="px-5 py-3.5 border-t border-gray-100 bg-slate-50 flex justify-end">
+          <button onClick={onClose} className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium shadow transition-colors">
+            Close Panel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const gateLabels = {
   cibil: "CIBIL Gate (Score ≥ 650)",
   spend: "Spend-to-Income Gate",
@@ -60,7 +115,7 @@ export default function UnderwriterSummary() {
     }
   };
 
-  // NATIVE WORD DOWNLOAD REWRITTEN TO STRICTLY MATCH THE UPLOADED PROPOSAL FILE TEMPLATE
+  // NATIVE WORD DOWNLOAD TRACKS THE EXACT STRUCTURE OF THE ACCEPETED PROPOSAL TEMPLATE
   const downloadNativeDocx = () => {
     if (!data) return;
     const { form, result } = data;
@@ -422,6 +477,7 @@ export default function UnderwriterSummary() {
 
   return (
     <div className="min-h-screen bg-[hsl(215,30%,97%)]">
+      {/* Target Render Fix */}
       <SummaryModal isOpen={showSummaryModal} onClose={() => setShowSummaryModal(false)} summary={summary} loading={loading} error={error} />
 
       <header className="bg-[hsl(224,58%,33%)] text-white shadow-lg print:hidden">
