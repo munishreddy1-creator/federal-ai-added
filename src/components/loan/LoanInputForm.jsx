@@ -16,7 +16,15 @@ function NumField({ label, value, onChange, prefix, suffix, placeholder, info })
         <input
           type="number"
           value={value ?? ""}
-          onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))}
+          onChange={(e) => {
+            const val = e.target.value;
+            // FIXED: Allows the minus sign string to remain active so underwriters can type -1 cleanly
+            if (val === "-") {
+              onChange(val);
+              return;
+            }
+            onChange(val === "" ? "" : Number(val));
+          }}
           placeholder={placeholder || "0"}
           className={`w-full h-11 rounded-lg border border-border bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 ${prefix ? "pl-8" : ""} ${suffix ? "pr-14" : ""}`}
         />
@@ -117,7 +125,8 @@ export default function LoanInputForm({ form, setForm, onCalculate }) {
         {/* Row 2: Tenure, CIBIL, Income */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <NumField label="Tenure (months)" value={form.tenure_months} onChange={(v) => update("tenure_months", v)} suffix="months" />
-          <NumField label="CIBIL Score" value={form.cibil_score} onChange={(v) => update("cibil_score", v)} placeholder="300-900" />
+          {/* UPDATED PLACEHOLDER TO ALERT USERS TO THE NEW -1 OPTION */}
+          <NumField label="CIBIL Score" value={form.cibil_score} onChange={(v) => update("cibil_score", v)} placeholder="300-900 or -1" />
           <NumField label="Monthly Income (₹)" value={form.monthly_income} onChange={(v) => update("monthly_income", v)} prefix="₹" />
         </div>
 
