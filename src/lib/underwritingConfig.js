@@ -100,8 +100,8 @@ export const GATE_THRESHOLDS = {
     manual: 650,
   },
   dti: {
-    pass: 0.5,
-    manual: 0.5,
+    pass: 0.6,
+    manual: 0.65,
   },
   spend: {
     pass: 0.5,
@@ -373,7 +373,7 @@ export const FIOR_SANCTION_RULES = {
     reductionThreshold: 0.59,                     // 50-59.99%: Reduce loan by 10%
     manualReviewThreshold: 0.70,                  // 60-69.99%: Manual review required
     rejectThreshold: 0.70,                        // 70%+: Hard rejection
-    loanReductionFactor: 0.9,                    // 10% reduction factor
+    loanReductionFactor: 1.0,                    // 10% reduction factor (1.0)
   },
   SELF_EMPLOYED: {
     // Self-employed FIOR thresholds (stricter)
@@ -381,7 +381,7 @@ export const FIOR_SANCTION_RULES = {
     reductionThreshold: 0.64,                     // 55-64.99%: Reduce loan by 10%
     manualReviewThreshold: 0.75,                  // 65-74.99%: Manual review required
     rejectThreshold: 0.75,                        // 75%+: Hard rejection
-    loanReductionFactor: 0.9,                    // 10% reduction factor
+    loanReductionFactor: 1.0,                    // 10% reduction factor (1.0)
   },
 };
 
