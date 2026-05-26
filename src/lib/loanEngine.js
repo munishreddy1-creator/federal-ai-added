@@ -98,6 +98,9 @@ export function buildAmortization(principal, annualRate, months, previewMonths =
 
 // ─── Score Components ─────────────────────────────────────────────────────────
 function scoreCIBIL(cibil) {
+  // UPDATED: Handle CIBIL -1 (No Credit History / New To Credit)
+  // Assigned a safe baseline profile metric of 65 points (similar to a fair 650 history)
+  if (cibil === -1) return 65; 
   if (cibil >= 800) return 100;
   if (cibil >= 750) return 100;
   if (cibil >= 700) return 90;
@@ -169,8 +172,12 @@ export function calcWeightedScore(scores) {
 // ─── Rate from Band ───────────────────────────────────────────────────────────
 function getRateBand(product, cibil) {
   const bands = RATE_BANDS[product] || RATE_BANDS["Housing Loan"];
+  
+  // UPDATED: If CIBIL is -1, treat pricing evaluation using standard/mid-tier risk bands (e.g. 650-700 range)
+  const effectiveCibil = cibil === -1 ? 675 : cibil;
+
   for (const band of bands) {
-    if (cibil >= band.min && cibil <= band.max) return band.rate;
+    if (effectiveCibil >= band.min && effectiveCibil <= band.max) return band.rate;
   }
   return { min: 14, max: 16 };
 }
@@ -210,8 +217,6 @@ function resolveFinalRate(band, weightedScore, season, customInterestRate = null
 }
 
 function finalRateFromScore(band, weightedScore, season) {
-  // Map score to rate with a gradual curve: high-quality borrowers still retain strong pricing,
-  // while lower quality profiles move closer to the top of the band.
   const t = Math.max(0, Math.min(1, weightedScore / 100));
   const curve = Math.pow(1 - t, 0.237);
   let rate = band.min + curve * (band.max - band.min);
@@ -226,8 +231,10 @@ function runGates(form, derived) {
 
   const gates = {};
 
-  // CIBIL gate
-  if (cibil_score >= GATE_THRESHOLDS.cibil.pass) gates.cibil = "PASS";
+  // UPDATED: CIBIL gate execution to handle -1
+  // If the score is -1 (New to Credit), route application to "MANUAL" review for standard policy underwriting verification
+  if (cibil_score === -1) gates.cibil = "MANUAL";
+  else if (cibil_score >= GATE_THRESHOLDS.cibil.pass) gates.cibil = "PASS";
   else if (cibil_score >= GATE_THRESHOLDS.cibil.manual) gates.cibil = "MANUAL";
   else gates.cibil = "REJECT";
 
@@ -265,7 +272,7 @@ function runGates(form, derived) {
   return gates;
 }
 
-// ─── Decision Engine (NEW: Priority-Based) ────────────────────────────────────
+// ─── Decision Engine (Priority-Based) ────────────────────────────────────
 /**
  * Evaluate final underwriting decision
  * Priority: Hard Rejects -> Manual Reviews -> Approval
@@ -366,7 +373,16 @@ export function generateReasonCodes(form, derived, gates, decision) {
   }
 
   // Gate-based Reasons
-  if (gates.cibil !== "PASS") {
+  // UPDATED: Provide an explicit reason breakdown code text for New to Credit applicants (-1)
+  if (cibil_score === -1) {
+    reasons.push({
+      code: "RC_NEW_TO_CREDIT",
+      label: "New to Credit / No History",
+      detail: "Applicant has no historical credit record (CIBIL -1). Requiring standard manual policy verification.",
+      severity: "LOW",
+      impact: "MANUAL_REVIEW",
+    });
+  } else if (gates.cibil !== "PASS") {
     reasons.push({
       code: "RC_LOW_CIBIL",
       label: "Low CIBIL Score",
@@ -474,7 +490,13 @@ export function generateReasonCodes(form, derived, gates, decision) {
 function buildRiskReasons(form, derived, gates) {
   const reasons = [];
 
-  if (gates.cibil !== "PASS") {
+  if (form.cibil_score === -1) {
+    reasons.push({
+      code: "RC01_NTC",
+      label: "New to Credit Portfolio",
+      detail: "No history found (-1). Forwarded for baseline parameter underwriting evaluation.",
+    });
+  } else if (gates.cibil !== "PASS") {
     reasons.push({
       code: "RC01",
       label: "Low CIBIL Score",
@@ -536,7 +558,6 @@ function buildRiskReasons(form, derived, gates) {
 
 // ─── Max Safe Loan ────────────────────────────────────────────────────────────
 function calcMaxSafeLoan(surplus, annualRate, months) {
-  // Max loan where stress EMI (at +2%) ≤ 85% of surplus
   const stressRate = annualRate + 2;
   const maxStressEMI = surplus * 0.85;
   return calcPrincipalFromEMI(maxStressEMI, stressRate, months);
@@ -598,7 +619,6 @@ export function evaluate(form) {
     savings_balance,
     loan_amount,
     collateral_value,
-    // NEW FIELDS
     isFestiveSeason = false,
     existingEMI = 0,
     existing_loans = null,
@@ -652,7 +672,7 @@ export function evaluate(form) {
   // ── Residual Income (PROJECTED - after new EMI) ──
   const projectedResidualIncome = monthly_income - effectiveExistingEMI - monthly_spends - estimatedNewEMI;
 
-  // ── Credit Risk Assessment (NEW) ──
+  // ── Credit Risk Assessment ──
   const creditRisk = {
     activeOverdueAmount: activeOverdueAmount || 0,
     emiDefaultCount: emiDefaultCount || 0,
@@ -661,12 +681,12 @@ export function evaluate(form) {
     primaryReason: activeOverdueAmount > 0 ? "ACTIVE_OVERDUE_PRESENT" : emiDefaultCount > 0 ? "EMI_DEFAULT_PRESENT" : overdueEMICount > 0 ? "OVERDUE_EMI_COUNT" : null,
   };
 
-  // ── Age-Based Adjustment (NEW) ──
+  // ── Age-Based Adjustment ──
   const ageAdjustment = applicantAge ? applyAgeBasedReduction(applicantAge, loan_amount) : { adjustedLoan: loan_amount, isAdjusted: false, reason: null };
   const isAgeAdjusted = ageAdjustment.isAdjusted;
   const adjustedLoanAmount = ageAdjustment.adjustedLoan;
 
-  // ── LTV Range Validation (NEW) ──
+  // ── LTV Range Validation ──
   const ltvRangeValidation = validateLTVRange(ltv);
 
   // ── Scores ──
@@ -693,7 +713,6 @@ export function evaluate(form) {
   const stressEMI = calcEMI(adjustedLoanAmount, stressRate, months);
   const totalEMI = effectiveExistingEMI + emi;
   const totalObligations = totalEMI;
-  // Total DTI and FIOR use the same formula: (existing EMI + new EMI) / income
   const totalDTI = monthly_income > 0 ? totalObligations / monthly_income : 0;
   const fiorRatio = totalDTI;
   const residualIncome = surplus - emi;
@@ -701,7 +720,7 @@ export function evaluate(form) {
   // ── Recalculate projected residual income with actual EMI ──
   const projectedResidualIncomeActual = monthly_income - effectiveExistingEMI - monthly_spends - emi;
   
-  // ── FIOR-Based Sanction Logic (NEW) ──
+  // ── FIOR-Based Sanction Logic ──
   const fiorSanction = evaluateFIORPolicy({
     fiorRatio,
     occupationType,
@@ -752,7 +771,6 @@ export function evaluate(form) {
   const decisionResult = evaluateFinalDecision(form, derived, gates);
   let decision = decisionResult.decision;
   
-  // Format decision for backward compatibility with tests
   if (decision === "MANUAL_REVIEW") {
     decision = "MANUAL REVIEW";
   }
@@ -784,13 +802,10 @@ export function evaluate(form) {
   const amortization = buildAmortization(approvedLoanAmount, finalRate, months, 12);
 
   return {
-    // applicant info
     applicant_name,
     product,
     isFestiveSeason: isFestive,
     occupationType,
-    
-    // ratios
     dti,
     totalDTI,
     spendToIncome,
@@ -798,57 +813,39 @@ export function evaluate(form) {
     ltvCap,
     ltvOutOfRange: !ltvRangeValidation.isInRange,
     ltvRangeWarning: ltvRangeValidation.warning,
-    
-    // surplus & residual
     surplus,
     currentSurplus,
     residualIncome,
     projectedResidualIncome: projectedResidualIncomeActual,
-
-    // EMI (NEW)
     existingEMI: effectiveExistingEMI,
     newEMI: emi,
     totalEMI,
     totalObligations,
-    emi, // new EMI with rate applied
+    emi,
     stressEMI,
     stressRate,
-
-    // credit risk (NEW)
     creditRisk,
     activeOverdueAmount,
     emiDefaultCount,
     overdueEMICount,
-
-    // age adjustment (NEW)
     applicantAge,
     isAgeAdjusted,
     adjustedLoanAmount,
     ageAdjustmentReason: ageAdjustment.reason,
-
-    // scoring
     scores,
     weightedScore,
-
-    // rate
     rateBand,
     finalRate,
     selectedInterestRate: finalRate,
     interestRateValidation,
     costOfFunds,
-
-    // EMI & totals
     totalAmountPaid,
     totalInterestPaid,
-
-    // decision (NEW)
     gates,
     decision,
     decisionReason: decisionResult.reason,
     reasonCodes,
-    riskReasons, // legacy
-
-    // FIOR-based sanction (NEW)
+    riskReasons,
     fiorRatio,
     fiorSanction,
     approvedLoanAmount,
@@ -861,15 +858,9 @@ export function evaluate(form) {
     requestedLoanAmount: eligibility.requestedLoanAmount,
     fiorAdjustmentReason,
     finalEmi,
-
-    // max safe loan
     maxSafeLoanAmount,
-
-    // NIM
     nimPct,
     nimAmount,
-
-    // amortization
     amortization,
   };
 }
