@@ -77,8 +77,8 @@ export default function LoanCalculator() {
               FC
             </div>
             <div>
-              <h1 className="font-bold text-base leading-tight">Retail Loan Pricing Engine</h1>
-              <p className="text-xs text-blue-200">Advanced Credit Assessment & Pricing Model</p>
+              <h1 className="font-bold text-base leading-tight">CreditPro</h1>
+              <p className="text-xs text-blue-200">Underwriting engine for loan proposal</p>
             </div>
           </div>
           <button
