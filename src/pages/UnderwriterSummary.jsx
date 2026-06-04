@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Printer, User, IndianRupee, ShieldCheck, ShieldX, ShieldAlert, Sparkles, X, FileText } from "lucide-react";
+import { ArrowLeft, Printer, User, IndianRupee, ShieldCheck, ShieldX, ShieldAlert, Sparkles, X, FileText, RotateCcw } from "lucide-react";
 import { summarizeLoanApplication } from "../lib/deepseekService";
 
 // Standard Financial Number Formatter
@@ -81,6 +81,42 @@ function SummaryModal({ isOpen, onClose, summary, loading, error }) {
   );
 }
 
+// Reset Confirmation Modal Component
+function ResetConfirmationModal({ isOpen, onConfirm, onCancel }) {
+  if (!isOpen) return null;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+      <div className="bg-white rounded-xl shadow-2xl w-full max-w-md flex flex-col border border-gray-200 overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+        <div className="px-5 py-4 border-b border-gray-100 bg-slate-50">
+          <div className="flex items-center gap-2">
+            <RotateCcw className="w-5 h-5 text-red-600" />
+            <h3 className="font-bold text-slate-900 text-base">Reset All Data?</h3>
+          </div>
+        </div>
+
+        <div className="p-6 text-sm leading-relaxed text-slate-700 space-y-4">
+          <p>
+            Are you sure you want to reset? This will clear all loan application data and return you to the calculator with blank fields.
+          </p>
+          <p className="text-xs text-slate-500">
+            This action cannot be undone.
+          </p>
+        </div>
+
+        <div className="px-5 py-3.5 border-t border-gray-100 bg-slate-50 flex justify-end gap-2">
+          <button onClick={onCancel} className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-900 rounded-lg text-xs font-medium shadow transition-colors">
+            Cancel
+          </button>
+          <button onClick={onConfirm} className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg text-xs font-medium shadow transition-colors">
+            Reset Data
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const gateLabels = {
   cibil: "CIBIL Gate (Score ≥ 650)",
   spend: "Spend-to-Income Gate",
@@ -98,6 +134,7 @@ export default function UnderwriterSummary() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [showSummaryModal, setShowSummaryModal] = useState(false);
+  const [showResetModal, setShowResetModal] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem("loanApplication");
@@ -118,6 +155,14 @@ export default function UnderwriterSummary() {
       setError(result.error);
       setSummary(null);
     }
+  };
+
+  const handleResetConfirm = () => {
+    // Clear localStorage
+    localStorage.removeItem("loanApplication");
+    setShowResetModal(false);
+    // Navigate back to calculator
+    navigate("/");
   };
 
   const downloadNativeDocx = () => {
@@ -151,8 +196,8 @@ export default function UnderwriterSummary() {
           .subtitle { text-align: center; font-size: 15px; color: #475569; margin-bottom: 20px; font-weight: 500; }
           .confidential { text-align: center; font-size: 11px; font-weight: bold; color: #94a3b8; letter-spacing: 3px; margin-bottom: 200px; }
           .meta-box { margin: 0 auto; width: 80%; border: 1px solid #e2e8f0; padding: 20px; background-color: #f8fafc; border-radius: 6px; }
-          .section-title { font-size: 15px; font-weight: bold; background-color: #f1f5f9; padding: 8px 12px; border-left: 5px solid #0f172a; color: #0f172a; text-transform: uppercase; margin-top: 30px; margin-bottom: 15px; }
-          .sub-section-title { font-size: 13px; font-weight: bold; color: #334155; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; padding-bottom: 3px; }
+          .section-title { font-size: 15px; font-weight: bold; background-color: #f1f5f9; padding: 8px 12px; border-left: 5px solid #0f172a; color: #0f172a; text-transform: uppercase; margin-top: 20px; margin-bottom: 12px; }
+          .sub-section-title { font-size: 13px; font-weight: bold; color: #334155; margin-top: 20px; margin-bottom: 8px; text-transform: uppercase; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
           table { width: 100%; border-collapse: collapse; margin-top: 10px; margin-bottom: 20px; }
           th, td { border: 1px solid #cbd5e1; padding: 10px; font-size: 12px; text-align: left; }
           th { background-color: #f8fafc; font-weight: bold; color: #0f172a; }
@@ -181,7 +226,7 @@ export default function UnderwriterSummary() {
 
         <div class="page-break"></div>
         <div class="section-title">1. EXECUTIVE SUMMARY</div>
-        <p>This document presents a comprehensive credit assessment and underwriting recommendation for a loan application evaluated through our standardized underwriting framework. The evaluation is based on quantitative financial metrics, credit history analysis, and collateral valuation.</p>
+        <p>This document presents a comprehensive credit assessment and underwriting recommendation for a loan application evaluated through our standardized underwriting framework. The evaluation encompasses credit bureau data, financial metrics, affordability parameters, and collateral valuation.</p>
         
         <div class="sub-section-title">Recommendation</div>
         <table>
@@ -292,7 +337,7 @@ export default function UnderwriterSummary() {
         </table>
 
         <div class="sub-section-title">Assessment & Conclusion</div>
-        <p>Credit analysis parameters extracted directly from metrics state evaluation. CIBIL check threshold assessment complete. The underlying records trace credit obligations and behavioral metrics configured within the framework engine profile data bounds.</p>
+        <p>Credit analysis parameters extracted directly from metrics state evaluation. CIBIL check threshold assessment complete. The underlying records trace credit obligations and behavioral metrics.</p>
 
         <div class="page-break"></div>
         <div class="section-title">4. FINANCIAL ASSESSMENT & AFFORDABILITY</div>
@@ -446,6 +491,7 @@ export default function UnderwriterSummary() {
   return (
     <div className="min-h-screen bg-[hsl(215,30%,97%)]">
       <SummaryModal isOpen={showSummaryModal} onClose={() => setShowSummaryModal(false)} summary={summary} loading={loading} error={error} />
+      <ResetConfirmationModal isOpen={showResetModal} onConfirm={handleResetConfirm} onCancel={() => setShowResetModal(false)} />
 
       <header className="bg-[hsl(224,58%,33%)] text-white shadow-lg print:hidden">
         <div className="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -467,6 +513,9 @@ export default function UnderwriterSummary() {
             </button>
             <button onClick={() => window.print()} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-blue-400 text-sm font-medium hover:bg-blue-700 transition-colors">
               <Printer className="w-4 h-4" /> Print / PDF
+            </button>
+            <button onClick={() => setShowResetModal(true)} className="flex items-center gap-2 px-3 py-2 rounded-lg border border-red-400 text-sm font-medium text-red-300 hover:bg-red-800 transition-colors">
+              <RotateCcw className="w-4 h-4" /> Reset
             </button>
           </div>
         </div>
