@@ -501,7 +501,7 @@ export default function UnderwriterSummary() {
             </button>
             <div>
               <h1 className="font-bold text-base">Underwriter Credit Summary</h1>
-              <p className="text-xs text-blue-200">FederalCreditPro — Core Evaluation Terminal</p>
+              <p className="text-xs text-blue-200">CreditPro — Core Evaluation Terminal</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
