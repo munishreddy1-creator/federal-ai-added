@@ -74,11 +74,11 @@ export default function LoanCalculator() {
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-9 h-9 bg-[hsl(45,93%,47%)] rounded-lg flex items-center justify-center font-bold text-[hsl(222,47%,11%)] text-base">
-              FC
+              Cp
             </div>
             <div>
               <h1 className="font-bold text-base leading-tight">CreditPro</h1>
-              <p className="text-xs text-blue-200">Underwriting engine for loan proposal</p>
+              <p className="text-xs text-blue-200">Underwriting engine</p>
             </div>
           </div>
           <button
