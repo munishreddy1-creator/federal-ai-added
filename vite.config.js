@@ -9,12 +9,4 @@ export default defineConfig({
       '@': path.resolve(__dirname, './src'),
     },
   },
-  optimizeDeps: {
-    include: ['@supabase/supabase-js'],
-  },
-  build: {
-    rollupOptions: {
-      external: [],
-    },
-  },
 })
