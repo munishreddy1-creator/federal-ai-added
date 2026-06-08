@@ -16,18 +16,17 @@ import PreviousLoanCheck from "../components/loan/previousloancheck";
 const DEFAULT_FORM = {
   product: "Housing Loan",
   isFestiveSeason: false,
-  tenure_months: 60,
-  cibil_score: 700,
-  monthly_income: 200000,
-  monthly_obligations: 45000,
+  tenure_months: "",         // required — blank
+  cibil_score: "",           // required — blank
+  monthly_income: "",
+  monthly_obligations: "",
   past_defaults: 0,
-  monthly_spends: 60000,
-  savings_balance: 200000,
-  loan_amount: 1000000,
-  collateral_value: 1500000,
-  applicant_name: "",
-  // NEW FIELDS
-  applicantAge: null,
+  monthly_spends: "",
+  savings_balance: "",
+  loan_amount: "",           // required — blank
+  collateral_value: "",
+  applicant_name: "",        // required — blank
+  applicantAge: "",          // required — blank
   occupationType: "SALARIED",
   existingEMI: 0,
   emiDefaultCount: 0,
@@ -38,10 +37,20 @@ const DEFAULT_FORM = {
   stressMultiplier: null,
 };
 
+// Required fields and their display labels
+const REQUIRED_FIELDS = {
+  applicant_name: "Applicant Name",
+  applicantAge: "Applicant Age",
+  loan_amount: "Loan Amount",
+  tenure_months: "Tenure (Months)",
+  cibil_score: "CIBIL Score",
+};
+
 export default function LoanCalculator() {
   const navigate = useNavigate();
   const [form, setForm] = useState(DEFAULT_FORM);
   const [result, setResult] = useState(null);
+  const [validationErrors, setValidationErrors] = useState({});
 
   // Restore form data from localStorage on component mount
   useEffect(() => {
@@ -57,7 +66,44 @@ export default function LoanCalculator() {
     }
   }, []);
 
+  const validate = () => {
+    const errors = {};
+
+    Object.entries(REQUIRED_FIELDS).forEach(([field, label]) => {
+      const value = form[field];
+      if (value === "" || value === null || value === undefined) {
+        errors[field] = `${label} is required`;
+      } else if (field !== "applicant_name" && isNaN(Number(value))) {
+        errors[field] = `${label} must be a valid number`;
+      } else if (field !== "applicant_name" && Number(value) <= 0) {
+        errors[field] = `${label} must be greater than 0`;
+      }
+    });
+
+    // Additional range checks
+    if (form.cibil_score && (Number(form.cibil_score) < 300 || Number(form.cibil_score) > 900)) {
+      errors.cibil_score = "CIBIL Score must be between 300 and 900";
+    }
+    if (form.applicantAge && (Number(form.applicantAge) < 18 || Number(form.applicantAge) > 75)) {
+      errors.applicantAge = "Age must be between 18 and 75";
+    }
+
+    return errors;
+  };
+
   const handleCalculate = () => {
+    const errors = validate();
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      // Scroll to the top of the form so user sees errors
+      document.getElementById("loan-input-form")?.scrollIntoView({ behavior: "smooth" });
+      return;
+    }
+
+    // Clear any previous errors
+    setValidationErrors({});
+
     const res = evaluate(form);
     setResult(res);
     // Save to localStorage for UnderwriterSummary
@@ -96,7 +142,15 @@ export default function LoanCalculator() {
         <PreviousLoanCheck />
 
         {/* Input Form */}
-        <LoanInputForm form={form} setForm={setForm} onCalculate={handleCalculate} />
+        <div id="loan-input-form">
+          <LoanInputForm
+            form={form}
+            setForm={setForm}
+            onCalculate={handleCalculate}
+            validationErrors={validationErrors}
+            setValidationErrors={setValidationErrors}
+          />
+        </div>
 
         {/* Results */}
         {result && (
