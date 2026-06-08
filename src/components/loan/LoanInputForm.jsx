@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { Calculator, IndianRupee, ChevronDown, AlertTriangle } from "lucide-react";
 import { COST_OF_FUNDS_OPTIONS, OCCUPATION_TYPE_OPTIONS } from "../../lib/underwritingConfig";
 
-// Required field keys
 const REQUIRED = ["applicant_name", "applicantAge", "loan_amount", "tenure_months", "cibil_score"];
 
 function FieldError({ message }) {
@@ -19,7 +18,7 @@ function RequiredStar() {
   return <span className="text-red-500 ml-0.5">*</span>;
 }
 
-function NumField({ label, fieldKey, value, onChange, prefix, suffix, placeholder, info, error, required }) {
+function NumField({ label, value, onChange, prefix, suffix, placeholder, info, error, required }) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">
@@ -39,10 +38,7 @@ function NumField({ label, fieldKey, value, onChange, prefix, suffix, placeholde
           onChange={(e) => onChange(e.target.value === "" ? "" : Number(e.target.value))}
           placeholder={placeholder || ""}
           className={`w-full h-11 rounded-lg border bg-white px-3 text-sm focus:outline-none focus:ring-2 transition-colors
-            ${error
-              ? "border-red-400 focus:ring-red-400 bg-red-50"
-              : "border-border focus:ring-blue-500"
-            }
+            ${error ? "border-red-400 focus:ring-red-400 bg-red-50" : "border-border focus:ring-blue-500"}
             ${prefix ? "pl-8" : ""}
             ${suffix ? "pr-14" : ""}
           `}
@@ -69,28 +65,9 @@ function SelectField({ label, value, onChange, options, info }) {
         className="w-full h-11 rounded-lg border border-border bg-white px-3 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
       >
         {options.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
+          <option key={opt.value} value={opt.value}>{opt.label}</option>
         ))}
       </select>
-    </div>
-  );
-}
-
-function CheckboxField({ label, checked, onChange, info }) {
-  return (
-    <div className="flex items-center gap-3 p-3 rounded-lg border border-border hover:bg-slate-50 cursor-pointer">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(e) => onChange(e.target.checked)}
-        className="w-4 h-4 rounded border-border accent-blue-600"
-      />
-      <div className="flex-1">
-        <label className="text-sm font-medium text-foreground/80 block cursor-pointer">{label}</label>
-        {info && <p className="text-xs text-muted-foreground mt-0.5">{info}</p>}
-      </div>
     </div>
   );
 }
@@ -106,7 +83,6 @@ export default function LoanInputForm({ form, setForm, onCalculate, validationEr
 
   const update = (key, val) => {
     setForm((prev) => ({ ...prev, [key]: val }));
-    // Clear error for this field as user types
     if (validationErrors[key] && setValidationErrors) {
       setValidationErrors((prev) => {
         const next = { ...prev };
@@ -123,7 +99,6 @@ export default function LoanInputForm({ form, setForm, onCalculate, validationEr
     form.customInterestRate !== undefined &&
     form.customInterestRate !== "";
 
-  // Count how many required fields are missing (for the warning banner)
   const missingCount = REQUIRED.filter((k) => {
     const v = form[k];
     return v === "" || v === null || v === undefined;
@@ -203,10 +178,8 @@ export default function LoanInputForm({ form, setForm, onCalculate, validationEr
             />
             <FieldError message={validationErrors.applicant_name} />
           </div>
-
           <NumField
             label="Age (years)"
-            fieldKey="applicantAge"
             value={form.applicantAge}
             onChange={(v) => update("applicantAge", v)}
             placeholder="e.g. 35"
@@ -216,11 +189,10 @@ export default function LoanInputForm({ form, setForm, onCalculate, validationEr
           />
         </div>
 
-        {/* Row 3: Tenure, CIBIL, Income — Tenure & CIBIL required */}
+        {/* Row 3: Tenure, CIBIL, Income */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <NumField
             label="Tenure (months)"
-            fieldKey="tenure_months"
             value={form.tenure_months}
             onChange={(v) => update("tenure_months", v)}
             suffix="months"
@@ -230,7 +202,6 @@ export default function LoanInputForm({ form, setForm, onCalculate, validationEr
           />
           <NumField
             label="CIBIL Score"
-            fieldKey="cibil_score"
             value={form.cibil_score}
             onChange={(v) => update("cibil_score", v)}
             placeholder="300–900"
@@ -246,15 +217,16 @@ export default function LoanInputForm({ form, setForm, onCalculate, validationEr
           />
         </div>
 
-        {/* Row 4: Obligations, Defaults, Spends */}
+        {/* Row 4: FOIR, Defaults, Spends */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {/* RENAMED: was "FOIR - Existing Monthly Obligations". Now the sole obligations field. */}
           <NumField
-            label="FOIR - Existing Monthly Obligations (₹)"
+            label="Existing Monthly EMI / Obligations (₹)"
             value={form.monthly_obligations}
             onChange={(v) => update("monthly_obligations", v)}
             prefix="₹"
             placeholder="e.g. 45000"
-            info="Use this OR Existing EMI — not both"
+            info="All existing loan EMIs combined"
           />
           <NumField
             label="Past Defaults"
@@ -271,7 +243,7 @@ export default function LoanInputForm({ form, setForm, onCalculate, validationEr
           />
         </div>
 
-        {/* Row 5: Savings, Loan Amount (required), Collateral */}
+        {/* Row 5: Savings, Loan Amount, Collateral */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           <NumField
             label="Savings Balance (₹)"
@@ -282,7 +254,6 @@ export default function LoanInputForm({ form, setForm, onCalculate, validationEr
           />
           <NumField
             label="Loan Amount (₹)"
-            fieldKey="loan_amount"
             value={form.loan_amount}
             onChange={(v) => update("loan_amount", v)}
             prefix="₹"
@@ -299,7 +270,7 @@ export default function LoanInputForm({ form, setForm, onCalculate, validationEr
           />
         </div>
 
-        {/* ── Manual Interest Rate Override ── */}
+        {/* Manual Interest Rate Override */}
         <div className={`rounded-xl border-2 p-4 transition-all ${hasManualRate ? "border-amber-400 bg-amber-50" : "border-dashed border-gray-200 bg-gray-50"}`}>
           <div className="flex items-start justify-between mb-3">
             <div>
@@ -340,9 +311,7 @@ export default function LoanInputForm({ form, setForm, onCalculate, validationEr
                   type="number"
                   step="0.01"
                   value={form.customInterestRate ?? ""}
-                  onChange={(e) =>
-                    update("customInterestRate", e.target.value === "" ? null : Number(e.target.value))
-                  }
+                  onChange={(e) => update("customInterestRate", e.target.value === "" ? null : Number(e.target.value))}
                   placeholder="e.g. 9.50  — leave blank for auto"
                   className={`w-full h-11 rounded-lg border px-3 pr-10 text-sm focus:outline-none focus:ring-2 transition-all ${
                     hasManualRate
@@ -353,7 +322,6 @@ export default function LoanInputForm({ form, setForm, onCalculate, validationEr
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm font-medium">%</span>
               </div>
             </div>
-
             {hasManualRate && (
               <div className="flex items-center gap-2 pb-1">
                 <div className="flex flex-col items-center">
@@ -386,18 +354,10 @@ export default function LoanInputForm({ form, setForm, onCalculate, validationEr
 
           {expandAdvanced && (
             <div className="space-y-5 bg-slate-50 p-4 rounded-lg">
-              {/* Credit Profile */}
+              {/* Credit Profile — existingEMI field removed */}
               <div className="border-b border-gray-100 pb-4">
                 <h4 className="text-sm font-semibold text-gray-900 mb-3">Credit Profile</h4>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  <NumField
-                    label="Existing EMI (₹/month)"
-                    value={form.existingEMI}
-                    onChange={(v) => update("existingEMI", v)}
-                    prefix="₹"
-                    placeholder="0"
-                    info="Use this OR FOIR above — not both"
-                  />
                   <NumField
                     label="EMI Default Count"
                     value={form.emiDefaultCount}
@@ -412,8 +372,6 @@ export default function LoanInputForm({ form, setForm, onCalculate, validationEr
                     placeholder="0"
                     info="Number of overdue EMIs"
                   />
-                </div>
-                <div className="mt-4">
                   <NumField
                     label="Active Overdue Amount (₹)"
                     value={form.activeOverdueAmount}
@@ -476,7 +434,6 @@ export default function LoanInputForm({ form, setForm, onCalculate, validationEr
           Calculate & Evaluate
         </button>
 
-        {/* Mandatory fields reminder below button */}
         {missingCount > 0 && (
           <p className="text-xs text-center text-muted-foreground">
             <span className="text-red-400">*</span> {missingCount} required field{missingCount > 1 ? "s" : ""} still empty — fill them before calculating
