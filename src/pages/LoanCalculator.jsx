@@ -16,19 +16,18 @@ import PreviousLoanCheck from "../components/loan/previousloancheck";
 const DEFAULT_FORM = {
   product: "Housing Loan",
   isFestiveSeason: false,
-  tenure_months: "",          // required
-  cibil_score: "",            // required
+  tenure_months: "",
+  cibil_score: "",
   monthly_income: "",
-  monthly_obligations: "",    // sole existing obligation input (FOIR) — existingEMI removed
+  monthly_obligations: "",
   past_defaults: 0,
   monthly_spends: "",
   savings_balance: "",
-  loan_amount: "",            // required
+  loan_amount: "",
   collateral_value: "",
-  applicant_name: "",         // required
-  applicantAge: "",           // required
+  applicant_name: "",
+  applicantAge: "",
   occupationType: "SALARIED",
-  // existingEMI removed
   emiDefaultCount: 0,
   overdueEMICount: 0,
   activeOverdueAmount: 0,
@@ -56,7 +55,6 @@ export default function LoanCalculator() {
     if (saved) {
       try {
         const { form: savedForm, result: savedResult } = JSON.parse(saved);
-        // Strip existingEMI if it exists in old saved data
         const { existingEMI: _removed, ...cleanForm } = savedForm;
         setForm({ ...DEFAULT_FORM, ...cleanForm });
         setResult(savedResult);
@@ -74,13 +72,20 @@ export default function LoanCalculator() {
         errors[field] = `${label} is required`;
       } else if (field !== "applicant_name" && isNaN(Number(value))) {
         errors[field] = `${label} must be a valid number`;
-      } else if (field !== "applicant_name" && Number(value) <= 0) {
+      } else if (field !== "applicant_name" && field !== "cibil_score" && Number(value) <= 0) {
+        // Exempting cibil_score from general > 0 validation rule to allow -1
         errors[field] = `${label} must be greater than 0`;
       }
     });
-    if (form.cibil_score && (Number(form.cibil_score) < 300 || Number(form.cibil_score) > 900)) {
-      errors.cibil_score = "CIBIL Score must be between 300 and 900";
+
+    // CUSTOM CIBIL RANGE BOUNDARY (Allows -1, or strict 300 to 900)
+    if (form.cibil_score !== "" && form.cibil_score !== null && form.cibil_score !== undefined) {
+      const cibilNum = Number(form.cibil_score);
+      if (cibilNum !== -1 && (cibilNum < 300 || cibilNum > 900)) {
+        errors.cibil_score = "CIBIL Score must be between 300 and 900, or -1 for New to Credit";
+      }
     }
+
     if (form.applicantAge && (Number(form.applicantAge) < 18 || Number(form.applicantAge) > 75)) {
       errors.applicantAge = "Age must be between 18 and 75";
     }
