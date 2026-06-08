@@ -25,21 +25,12 @@ import {
 } from "./underwritingConfig.js";
 
 // ─── Safe Number Coercion ─────────────────────────────────────────────────────
-/**
- * Converts a form field value to a number safely.
- * Returns NaN if the value is blank/null/undefined (so callers can detect missing required fields).
- * Returns 0 for explicitly passed 0.
- */
 function toNum(val) {
   if (val === "" || val === null || val === undefined) return NaN;
   const n = Number(val);
   return isNaN(n) ? NaN : n;
 }
 
-/**
- * Converts a form field to a non-negative number, defaulting to 0 for blank/null/undefined.
- * Use for optional fields where absence means zero.
- */
 function toNumOrZero(val) {
   if (val === "" || val === null || val === undefined) return 0;
   const n = Number(val);
@@ -62,21 +53,9 @@ function calcPrincipalFromEMI(emi, annualRate, months) {
   return (emi * (Math.pow(1 + r, months) - 1)) / (r * Math.pow(1 + r, months));
 }
 
-// ─── Aggregate Existing EMIs ──────────────────────────────────────────────────
-export function aggregateExistingEMIs(existingLoans) {
-  if (!existingLoans) return 0;
-  if (typeof existingLoans === "number") return Math.max(0, existingLoans);
-  if (Array.isArray(existingLoans)) {
-    return existingLoans.reduce((sum, loan) => sum + (loan.emi ? Math.max(0, loan.emi) : 0), 0);
-  }
-  return 0;
-}
-
-export function resolveExistingEMI(aggregatedExistingEMI, monthlyObligations) {
-  const explicit = Math.max(0, aggregatedExistingEMI || 0);
-  const foir = Math.max(0, monthlyObligations || 0);
-  return explicit > 0 ? explicit : foir;
-}
+// ─── REMOVED: aggregateExistingEMIs & resolveExistingEMI ─────────────────────
+// existingEMI field has been removed. monthly_obligations (FOIR) is now the
+// sole source for existing obligation input. No aggregation layer needed.
 
 // ─── Amortization Schedule ────────────────────────────────────────────────────
 export function buildAmortization(principal, annualRate, months, previewMonths = 12) {
@@ -255,7 +234,7 @@ function runGates(form, derived) {
 // ─── Decision Engine ──────────────────────────────────────────────────────────
 export function evaluateFinalDecision(form, derived, gates) {
   const { past_defaults } = form;
-  const { projectedResidualIncome, creditRisk, ltvOutOfRange } = derived;
+  const { projectedResidualIncome, creditRisk } = derived;
 
   if (projectedResidualIncome <= 0) return { decision: "REJECT", reason: "AFFORDABILITY_FAILURE" };
   if (past_defaults >= 2) return { decision: "REJECT", reason: "EXCESSIVE_PAST_DEFAULTS" };
@@ -272,7 +251,7 @@ export function evaluateFinalDecision(form, derived, gates) {
 export function generateReasonCodes(form, derived, gates, decision) {
   const reasons = [];
   const { cibil_score, past_defaults } = form;
-  const { dti, totalDTI, ltv, ltvCap, spendToIncome, surplus, emi, stressEMI, creditRisk, isFestiveSeason, isAgeAdjusted } = derived;
+  const { totalDTI, ltv, ltvCap, spendToIncome, surplus, emi, stressEMI, creditRisk, isFestiveSeason, isAgeAdjusted } = derived;
 
   if (creditRisk?.hasCreditRisk) {
     if (creditRisk.activeOverdueAmount > 0)
@@ -296,14 +275,13 @@ export function generateReasonCodes(form, derived, gates, decision) {
   if (gates.stress !== "PASS") reasons.push({ code: "RC_STRESS_FAIL", label: "Fails Stress Test", detail: `At +2% rate shock, EMI would be ₹${Math.round(stressEMI).toLocaleString("en-IN")}, exceeding 85% of surplus.`, severity: "MEDIUM", impact: gates.stress === "REJECT" ? "REJECT" : "MANUAL_REVIEW" });
   if (gates.residual !== "PASS") reasons.push({ code: "RC_RESIDUAL_LOW", label: "Low Residual Income", detail: "After EMI deduction, remaining income is below minimum comfort threshold.", severity: "MEDIUM", impact: gates.residual === "REJECT" ? "REJECT" : "MANUAL_REVIEW" });
   if (past_defaults >= 1) reasons.push({ code: "RC_PAST_DEFAULTS", label: "Past Default History", detail: `${past_defaults} past default(s) recorded on credit file.`, severity: "HIGH", impact: past_defaults >= 2 ? "REJECT" : "MANUAL_REVIEW" });
-
   if (isAgeAdjusted) reasons.push({ code: "RC_AGE_REDUCTION", label: "Age-Based Loan Reduction Applied", detail: `Loan eligibility adjusted based on applicant age.`, severity: "LOW", impact: "INFO" });
   if (isFestiveSeason && form.product === "Auto Loan") reasons.push({ code: "RC_FESTIVE_LTV", label: "Festive Season LTV Applied", detail: `Auto Loan LTV cap increased to 95% for festive season.`, severity: "LOW", impact: "INFO" });
 
   return reasons;
 }
 
-// Legacy reason builder (kept for backward compatibility)
+// Legacy reason builder
 function buildRiskReasons(form, derived, gates) {
   const reasons = [];
   if (form.cibil_score === -1) {
@@ -353,40 +331,35 @@ function calculateEligibilityCaps({ requestedLoanAmount, collateralValue, ltvCap
 
 // ─── Main Evaluate Function ───────────────────────────────────────────────────
 export function evaluate(form) {
-  // ── Coerce all form fields to numbers upfront ──────────────────────────────
-  // Required fields: use toNum() — NaN if blank (validation should have blocked these,
-  // but we guard here so the engine never silently produces garbage output)
-  const tenure_months  = toNum(form.tenure_months);
-  const cibil_score    = toNum(form.cibil_score);
-  const loan_amount    = toNum(form.loan_amount);
-  // applicantAge & applicant_name: handled separately below
+  // ── Required fields ───────────────────────────────────────────────────────
+  const tenure_months = toNum(form.tenure_months);
+  const cibil_score   = toNum(form.cibil_score);
+  const loan_amount   = toNum(form.loan_amount);
 
-  // Optional fields: use toNumOrZero() — blank → 0
-  const monthly_income       = toNumOrZero(form.monthly_income);
-  const monthly_obligations  = toNumOrZero(form.monthly_obligations);
-  const past_defaults        = toNumOrZero(form.past_defaults);
-  const monthly_spends       = toNumOrZero(form.monthly_spends);
-  const savings_balance      = toNumOrZero(form.savings_balance);
-  const collateral_value     = toNumOrZero(form.collateral_value);
-  const existingEMI          = toNumOrZero(form.existingEMI);
-  const emiDefaultCount      = toNumOrZero(form.emiDefaultCount);
-  const overdueEMICount      = toNumOrZero(form.overdueEMICount);
-  const activeOverdueAmount  = toNumOrZero(form.activeOverdueAmount);
+  // ── Optional fields (blank → 0) ───────────────────────────────────────────
+  const monthly_income      = toNumOrZero(form.monthly_income);
+  // monthly_obligations is now the SOLE existing obligation input (FOIR).
+  // existingEMI has been removed from the form entirely.
+  const monthly_obligations = toNumOrZero(form.monthly_obligations);
+  const past_defaults       = toNumOrZero(form.past_defaults);
+  const monthly_spends      = toNumOrZero(form.monthly_spends);
+  const savings_balance     = toNumOrZero(form.savings_balance);
+  const collateral_value    = toNumOrZero(form.collateral_value);
+  const emiDefaultCount     = toNumOrZero(form.emiDefaultCount);
+  const overdueEMICount     = toNumOrZero(form.overdueEMICount);
+  const activeOverdueAmount = toNumOrZero(form.activeOverdueAmount);
 
-  // Non-numeric fields
-  const product           = form.product || "Housing Loan";
-  const isFestiveSeason   = form.isFestiveSeason || (form.season === "Festival");
-  const existing_loans    = form.existing_loans || null;
-  const applicantAge      = form.applicantAge !== "" && form.applicantAge !== null && form.applicantAge !== undefined ? Number(form.applicantAge) : null;
-  const occupationType    = form.occupationType || "SALARIED";
-  const customCostOfFunds = form.customCostOfFunds ?? null;
+  // ── Non-numeric fields ────────────────────────────────────────────────────
+  const product            = form.product || "Housing Loan";
+  const isFestiveSeason    = form.isFestiveSeason || (form.season === "Festival");
+  const applicantAge       = (form.applicantAge !== "" && form.applicantAge !== null && form.applicantAge !== undefined) ? Number(form.applicantAge) : null;
+  const occupationType     = form.occupationType || "SALARIED";
+  const customCostOfFunds  = form.customCostOfFunds ?? null;
   const customInterestRate = form.customInterestRate ?? null;
-  const stressMultiplier  = form.stressMultiplier ?? null;
-  const applicant_name    = form.applicant_name || "";
+  const stressMultiplier   = form.stressMultiplier ?? null;
+  const applicant_name     = form.applicant_name || "";
 
-  // Guard: if any required field is NaN (blank), return a safe error result
-  // This should never happen if validation in LoanCalculator is working,
-  // but acts as a last-line safety net
+  // ── Safety net guard ──────────────────────────────────────────────────────
   if (isNaN(tenure_months) || isNaN(cibil_score) || isNaN(loan_amount)) {
     return {
       _error: true,
@@ -406,10 +379,9 @@ export function evaluate(form) {
   const ltvCap = getLTVCap(product, isFestive);
   const costOfFunds = getCostOfFunds(product, customCostOfFunds);
 
-  const aggregatedExistingEMI = existing_loans
-    ? aggregateExistingEMIs(existing_loans)
-    : aggregateExistingEMIs(existingEMI);
-  const effectiveExistingEMI = resolveExistingEMI(aggregatedExistingEMI, monthly_obligations);
+  // SIMPLIFIED: effectiveExistingEMI comes directly from monthly_obligations (FOIR only).
+  // The existingEMI field and aggregateExistingEMIs/resolveExistingEMI path are gone.
+  const effectiveExistingEMI = Math.max(0, monthly_obligations);
 
   const dti = monthly_income > 0 ? effectiveExistingEMI / monthly_income : 0;
   const spendToIncome = monthly_income > 0 ? monthly_spends / monthly_income : 0;
@@ -418,7 +390,6 @@ export function evaluate(form) {
 
   const estimatedNewEMI = calcEMI(loan_amount, 0, months);
   const estimatedTotalDTI = monthly_income > 0 ? (effectiveExistingEMI + estimatedNewEMI) / monthly_income : 0;
-
   const projectedResidualIncome = monthly_income - effectiveExistingEMI - monthly_spends - estimatedNewEMI;
 
   const creditRisk = {
@@ -545,7 +516,7 @@ export function evaluate(form) {
     currentSurplus: surplus,
     residualIncome,
     projectedResidualIncome: projectedResidualIncomeActual,
-    existingEMI: effectiveExistingEMI,
+    existingEMI: effectiveExistingEMI,   // kept in output for display components that read result.existingEMI
     newEMI: emi,
     totalEMI,
     totalObligations,
